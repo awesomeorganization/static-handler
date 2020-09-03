@@ -1,0 +1,27 @@
+{
+  "name": "@awesomeorganization/static-handler",
+  "description": "[ESM] The static handler for Node.js according to rfc7232, rfc7234 and whatwg",
+  "version": "0.1.0",
+  "main": "main.js",
+  "type": "module",
+  "repository": "github:awesomeorganization/static-handler",
+  "license": "MIT",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "author": {
+    "name": "sergeysedoy97"
+  },
+  "devDependencies": {
+    "@awesomeorganization/servers": "latest",
+    "eslint-config-prettier": "latest"
+  },
+  "keywords": [
+    "rfc7232",
+    "rfc7234",
+    "serve",
+    "serving",
+    "static-content",
+    "whatwg"
+  ]
+}
