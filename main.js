@@ -1,8 +1,9 @@
-import { resolve as getAbsolutePath, extname as getExtension, sep as separator } from 'path'
-import { stat as getStats, opendir as openDirectory } from 'fs/promises'
+import { resolve as getAbsolutePath, extname as getExtension } from 'path'
 
 import { STATUS_CODES } from 'http'
 import { createReadStream } from 'fs'
+import { stat as getStats } from 'fs/promises'
+import { parse } from 'url'
 
 // REFERENCES
 // https://tools.ietf.org/html/rfc7232#section-3.3
@@ -33,31 +34,26 @@ const DEFAULT_CONTENT_TYPE_BY_EXTENSIONS = new Map([
 ])
 const DEFAULT_PATHNAME_ALIASES = new Map([['/', '/index.html']])
 
-const scanDirectory = async ({ contentTypeByExtensions, defaultContentType, directoryPath, filesByPathname, route }) => {
-  const directory = await openDirectory(directoryPath)
-  for await (const entity of directory) {
-    const entityPath = directoryPath + separator + entity.name
-    if (entity.isFile() === true) {
-      filesByPathname.set(route + entity.name, {
-        absolutePath: entityPath,
-        contentType: contentTypeByExtensions.get(getExtension(entity.name)) ?? defaultContentType,
-      })
-      continue
-    }
-    if (entity.isDirectory() === true) {
-      await scanDirectory({
-        contentTypeByExtensions,
-        defaultContentType,
-        directoryPath: entityPath,
-        filesByPathname,
-        route: route + entity.name + '/',
-      })
-      continue
-    }
-  }
+const notFound = ({ response }) => {
+  response
+    .writeHead(STATUS_NOT_FOUND, STATUS_CODES[STATUS_NOT_FOUND], {
+      'Cache-Control': 'no-store',
+    })
+    .end()
 }
 
-export const staticHandler = async (
+const notModified = ({ headers, response }) => {
+  response.writeHead(STATUS_NOT_MODIFIED, STATUS_CODES[STATUS_NOT_MODIFIED], headers).end()
+}
+
+const ok = ({ file, headers, response }) => {
+  response.writeHead(STATUS_OK, STATUS_CODES[STATUS_OK], headers)
+  createReadStream(file.absolutePath, {
+    encoding: 'binary',
+  }).pipe(response)
+}
+
+export const staticHandler = (
   {
     contentTypeByExtensions = DEFAULT_CONTENT_TYPE_BY_EXTENSIONS,
     defaultContentType = DEFAULT_CONTENT_TYPE,
@@ -70,49 +66,57 @@ export const staticHandler = async (
     pathnameAliases: DEFAULT_PATHNAME_ALIASES,
   }
 ) => {
-  const filesByPathname = new Map()
-  const scanDirectoryOptions = {
-    contentTypeByExtensions,
-    defaultContentType,
-    directoryPath,
-    filesByPathname,
-    route: '/',
-  }
-  await scanDirectory(scanDirectoryOptions)
   return {
-    async handle({ request: { headers, url }, response }) {
-      const pathnameIndexEnd = url.indexOf('?')
-      const pathname = pathnameIndexEnd === -1 ? url : url.substring(0, pathnameIndexEnd)
-      const file = filesByPathname.get(pathnameAliases.get(pathname) ?? pathname)
-      if (file === undefined) {
-        response
-          .writeHead(STATUS_NOT_FOUND, STATUS_CODES[STATUS_NOT_FOUND], {
-            'Cache-Control': 'no-store',
-          })
-          .end()
-      } else {
-        const { absolutePath, contentType } = file
-        const { mtime: lastModified, size: contentLength } = await getStats(absolutePath)
-        const responseHeaders = {
-          'Cache-Control': 'public',
-          'Content-Length': contentLength,
-          'Content-Type': contentType,
-          'Last-Modified': lastModified.toUTCString(),
-        }
-        const lastModifiedInUnixTime = lastModified.valueOf() - (lastModified.valueOf() % 1000)
-        if ('if-modified-since' in headers === true && Date.parse(headers['if-modified-since']) >= lastModifiedInUnixTime) {
-          response.writeHead(STATUS_NOT_MODIFIED, STATUS_CODES[STATUS_NOT_MODIFIED], responseHeaders).end()
+    async handle({
+      request: {
+        headers: { 'if-modified-since': ifModifiedSince = null },
+        url,
+      },
+      response,
+    }) {
+      const { pathname } = parse(url)
+      const pathnameAlias = pathnameAliases.get(pathname) ?? pathname
+      const file = {
+        absolutePath: getAbsolutePath(directoryPath, pathnameAlias.substring(1)),
+        contentType: contentTypeByExtensions.get(getExtension(pathnameAlias)) ?? defaultContentType,
+        isExists: true,
+      }
+      try {
+        const stats = await getStats(file.absolutePath)
+        if (stats.isFile() === false) {
+          file.isExists = false
         } else {
-          response.writeHead(STATUS_OK, STATUS_CODES[STATUS_OK], responseHeaders)
-          createReadStream(absolutePath, {
-            encoding: 'binary',
-          }).pipe(response)
+          file.contentLength = stats.size
+          file.lastModified = stats.mtime
+        }
+      } catch {
+        file.isExists = false
+      }
+      if (file.isExists === false) {
+        notFound({
+          response,
+        })
+      } else {
+        const headers = {
+          'Cache-Control': 'public',
+          'Content-Length': file.contentLength,
+          'Content-Type': file.contentType,
+          'Last-Modified': file.lastModified.toUTCString(),
+        }
+        const lastModifiedInUnixTime = file.lastModified.valueOf() - (file.lastModified.valueOf() % 1000)
+        if (ifModifiedSince !== null && Date.parse(ifModifiedSince) >= lastModifiedInUnixTime) {
+          notModified({
+            headers,
+            response,
+          })
+        } else {
+          ok({
+            file,
+            headers,
+            response,
+          })
         }
       }
-    },
-    rescanDirectory() {
-      filesByPathname.clear()
-      return scanDirectory(scanDirectoryOptions)
     },
   }
 }

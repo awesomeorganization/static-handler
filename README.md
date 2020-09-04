@@ -16,15 +16,15 @@
 ## Example
 
 ```
-import { httpServer } from '@awesomeorganization/servers'
-import { serve } from '@awesomeorganization/static-handler'
+import { http } from '@awesomeorganization/servers'
+import { staticHandler } from '@awesomeorganization/static-handler'
 
-const { listener } = await serve()
+const { handle } = staticHandler()
 
-await httpServer({
+await http({
   host: '127.0.0.1',
   onRequest: async (request, response) => {
-    await listener({
+    await handle({
       request,
       response,
     })
