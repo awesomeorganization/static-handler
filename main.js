@@ -7,12 +7,14 @@ import { parse } from 'url'
 
 // REFERENCES
 // https://tools.ietf.org/html/rfc7232#section-3.3
+// https://tools.ietf.org/html/rfc7232#section-3.4
 // https://tools.ietf.org/html/rfc7234
 // https://fetch.spec.whatwg.org/
 
 const STATUS_OK = 200
 const STATUS_NOT_MODIFIED = 304
 const STATUS_NOT_FOUND = 404
+const STATUS_PRECONDITION_FAILED = 412
 const DEFAULT_CONTENT_TYPE = 'application/octet-stream'
 const DEFAULT_DIRECTORY_PATH = getAbsolutePath('.')
 const DEFAULT_CONTENT_TYPE_BY_EXTENSIONS = new Map([
@@ -33,6 +35,14 @@ const DEFAULT_CONTENT_TYPE_BY_EXTENSIONS = new Map([
   ['.xml', 'application/xml'],
 ])
 const DEFAULT_PATHNAME_ALIASES = new Map([['/', '/index.html']])
+
+const preconditionFailed = ({ response }) => {
+  response
+    .writeHead(STATUS_PRECONDITION_FAILED, STATUS_CODES[STATUS_PRECONDITION_FAILED], {
+      'Cache-Control': 'no-store',
+    })
+    .end()
+}
 
 const notFound = ({ response }) => {
   response
@@ -69,7 +79,7 @@ export const staticHandler = (
   return {
     async handle({
       request: {
-        headers: { 'if-modified-since': ifModifiedSince = null },
+        headers: { 'if-modified-since': ifModifiedSince = null, 'if-unmodified-since': ifUnmodifiedSince = null },
         url,
       },
       response,
@@ -97,24 +107,30 @@ export const staticHandler = (
           response,
         })
       } else {
-        const headers = {
-          'Cache-Control': 'public',
-          'Content-Length': file.contentLength,
-          'Content-Type': file.contentType,
-          'Last-Modified': file.lastModified.toUTCString(),
-        }
         const lastModifiedInUnixTime = file.lastModified.valueOf() - (file.lastModified.valueOf() % 1000)
-        if (ifModifiedSince !== null && Date.parse(ifModifiedSince) >= lastModifiedInUnixTime) {
-          notModified({
-            headers,
+        if (ifUnmodifiedSince !== null && Date.parse(ifUnmodifiedSince) < lastModifiedInUnixTime) {
+          preconditionFailed({
             response,
           })
         } else {
-          ok({
-            file,
-            headers,
-            response,
-          })
+          const headers = {
+            'Cache-Control': 'public',
+            'Content-Length': file.contentLength,
+            'Content-Type': file.contentType,
+            'Last-Modified': file.lastModified.toUTCString(),
+          }
+          if (ifModifiedSince !== null && Date.parse(ifModifiedSince) >= lastModifiedInUnixTime) {
+            notModified({
+              headers,
+              response,
+            })
+          } else {
+            ok({
+              file,
+              headers,
+              response,
+            })
+          }
         }
       }
     },
