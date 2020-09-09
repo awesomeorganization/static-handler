@@ -1,15 +1,19 @@
 import { resolve as getAbsolutePath, extname as getExtension } from 'path'
 
 import { STATUS_CODES } from 'http'
+import { createHash } from 'crypto'
 import { createReadStream } from 'fs'
 import { stat as getStats } from 'fs/promises'
-import { parse } from 'url'
+import { parse as parseURL } from 'url'
 
 // REFERENCES
+// https://tools.ietf.org/html/rfc7232#section-3.1
+// https://tools.ietf.org/html/rfc7232#section-3.2
 // https://tools.ietf.org/html/rfc7232#section-3.3
 // https://tools.ietf.org/html/rfc7232#section-3.4
 // https://tools.ietf.org/html/rfc7234
 // https://fetch.spec.whatwg.org/
+// https://blake2.net/blake2.pdf
 
 const STATUS_OK = 200
 const STATUS_NOT_MODIFIED = 304
@@ -35,6 +39,40 @@ const DEFAULT_CONTENT_TYPE_BY_EXTENSIONS = new Map([
   ['.xml', 'application/xml'],
 ])
 const DEFAULT_PATHNAME_ALIASES = new Map([['/', '/index.html']])
+const DEFAULT_USE_WEAK_ETAGS = true
+
+const generateHeaders = ({ file }) => {
+  return {
+    'Cache-Control': 'public',
+    'Content-Length': file.contentLength,
+    'Content-Type': file.contentType,
+    'ETag': file.eTag,
+    'Last-Modified': file.lastModified,
+  }
+}
+
+const generateWeakETag = ({ stats: { mtime } }) => {
+  const value = mtime.valueOf().toString(32)
+  return `W/"${value}"`
+}
+
+const generateStrongETag = ({ file }) => {
+  return new Promise((resolve) => {
+    const hash = createHash('blake2b512')
+    const readStream = createReadStream(file.absolutePath, {
+      encoding: 'binary',
+    })
+    readStream.on('readable', () => {
+      const chunk = readStream.read()
+      if (chunk === null) {
+        const value = hash.digest('base64')
+        resolve(`"${value}"`)
+      } else {
+        hash.update(chunk)
+      }
+    })
+  })
+}
 
 const preconditionFailed = ({ response }) => {
   response
@@ -52,12 +90,26 @@ const notFound = ({ response }) => {
     .end()
 }
 
-const notModified = ({ headers, response }) => {
-  response.writeHead(STATUS_NOT_MODIFIED, STATUS_CODES[STATUS_NOT_MODIFIED], headers).end()
+const notModified = ({ file, response }) => {
+  response
+    .writeHead(
+      STATUS_NOT_MODIFIED,
+      STATUS_CODES[STATUS_NOT_MODIFIED],
+      generateHeaders({
+        file,
+      })
+    )
+    .end()
 }
 
-const ok = ({ file, headers, response }) => {
-  response.writeHead(STATUS_OK, STATUS_CODES[STATUS_OK], headers)
+const ok = ({ file, response }) => {
+  response.writeHead(
+    STATUS_OK,
+    STATUS_CODES[STATUS_OK],
+    generateHeaders({
+      file,
+    })
+  )
   createReadStream(file.absolutePath, {
     encoding: 'binary',
   }).pipe(response)
@@ -69,22 +121,29 @@ export const staticHandler = (
     defaultContentType = DEFAULT_CONTENT_TYPE,
     directoryPath = DEFAULT_DIRECTORY_PATH,
     pathnameAliases = DEFAULT_PATHNAME_ALIASES,
+    useWeakETags = DEFAULT_USE_WEAK_ETAGS,
   } = {
     contentTypeByExtensions: DEFAULT_CONTENT_TYPE_BY_EXTENSIONS,
     defaultContentType: DEFAULT_CONTENT_TYPE,
     directoryPath: DEFAULT_DIRECTORY_PATH,
     pathnameAliases: DEFAULT_PATHNAME_ALIASES,
+    useWeakETags: DEFAULT_USE_WEAK_ETAGS,
   }
 ) => {
   return {
     async handle({
       request: {
-        headers: { 'if-modified-since': ifModifiedSince = null, 'if-unmodified-since': ifUnmodifiedSince = null },
+        headers: {
+          'if-match': ifMatch = null,
+          'if-modified-since': ifModifiedSince = null,
+          'if-none-match': ifNoneMatch = null,
+          'if-unmodified-since': ifUnmodifiedSince = null,
+        },
         url,
       },
       response,
     }) {
-      const { pathname } = parse(url)
+      const { pathname } = parseURL(url)
       const pathnameAlias = pathnameAliases.get(pathname) ?? pathname
       const file = {
         absolutePath: getAbsolutePath(directoryPath, pathnameAlias.substring(1)),
@@ -97,7 +156,16 @@ export const staticHandler = (
           file.isExists = false
         } else {
           file.contentLength = stats.size
-          file.lastModified = stats.mtime
+          file.lastModified = stats.mtime.toUTCString()
+          if (useWeakETags === true) {
+            file.eTag = generateWeakETag({
+              stats,
+            })
+          } else {
+            file.eTag = await generateStrongETag({
+              file,
+            })
+          }
         }
       } catch {
         file.isExists = false
@@ -106,32 +174,23 @@ export const staticHandler = (
         notFound({
           response,
         })
+      } else if ((ifMatch !== null && ifMatch !== file.eTag) || (ifMatch === null && ifUnmodifiedSince !== null && ifUnmodifiedSince < file.lastModified)) {
+        preconditionFailed({
+          response,
+        })
+      } else if (
+        (ifNoneMatch !== null && ifNoneMatch === file.eTag) ||
+        (ifNoneMatch === null && ifModifiedSince !== null && ifModifiedSince >= file.lastModified)
+      ) {
+        notModified({
+          file,
+          response,
+        })
       } else {
-        const lastModifiedInUnixTime = file.lastModified.valueOf() - (file.lastModified.valueOf() % 1000)
-        if (ifUnmodifiedSince !== null && Date.parse(ifUnmodifiedSince) < lastModifiedInUnixTime) {
-          preconditionFailed({
-            response,
-          })
-        } else {
-          const headers = {
-            'Cache-Control': 'public',
-            'Content-Length': file.contentLength,
-            'Content-Type': file.contentType,
-            'Last-Modified': file.lastModified.toUTCString(),
-          }
-          if (ifModifiedSince !== null && Date.parse(ifModifiedSince) >= lastModifiedInUnixTime) {
-            notModified({
-              headers,
-              response,
-            })
-          } else {
-            ok({
-              file,
-              headers,
-              response,
-            })
-          }
-        }
+        ok({
+          file,
+          response,
+        })
       }
     },
   }
