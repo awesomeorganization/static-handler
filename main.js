@@ -7,6 +7,8 @@ import { stat as getStats } from 'fs/promises'
 import { parse as parseURL } from 'url'
 
 // REFERENCES
+// https://tools.ietf.org/html/rfc7230#section-3
+// https://tools.ietf.org/html/rfc7231#section-5.2
 // https://tools.ietf.org/html/rfc7232#section-3.1
 // https://tools.ietf.org/html/rfc7232#section-3.2
 // https://tools.ietf.org/html/rfc7232#section-3.3
@@ -14,6 +16,11 @@ import { parse as parseURL } from 'url'
 // https://tools.ietf.org/html/rfc7234
 // https://fetch.spec.whatwg.org/
 // https://blake2.net/blake2.pdf
+
+// TODO
+// https://tools.ietf.org/html/rfc7230#section-4
+// https://tools.ietf.org/html/rfc7231#section-5.3
+// https://tools.ietf.org/html/rfc7233
 
 const STATUS_OK = 200
 const STATUS_NOT_MODIFIED = 304
@@ -59,18 +66,14 @@ const generateWeakETag = ({ stats: { mtime } }) => {
 const generateStrongETag = ({ file }) => {
   return new Promise((resolve) => {
     const hash = createHash('blake2b512')
-    const readStream = createReadStream(file.absolutePath, {
+    createReadStream(file.absolutePath, {
       encoding: 'binary',
     })
-    readStream.on('readable', () => {
-      const chunk = readStream.read()
-      if (chunk === null) {
-        const value = hash.digest('base64')
+      .on('close', () => {
+        const value = hash.read().toString('base64')
         resolve(`"${value}"`)
-      } else {
-        hash.update(chunk)
-      }
-    })
+      })
+      .pipe(hash)
   })
 }
 
