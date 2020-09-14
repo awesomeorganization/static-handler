@@ -140,12 +140,13 @@ export const staticHandler = (
           'if-modified-since': ifModifiedSince = null,
           'if-none-match': ifNoneMatch = null,
           'if-unmodified-since': ifUnmodifiedSince = null,
+          host,
         },
         url,
       },
       response,
     }) {
-      const { pathname } = new URL(url)
+      const { pathname } = new URL(url, `protocol://${host}`) // WTF Node.js? https://nodejs.org/api/http.html#http_message_url
       const pathnameAlias = pathnameAliases.get(pathname) ?? pathname
       const file = {
         absolutePath: getAbsolutePath(directoryPath, pathnameAlias.substring(1)),
