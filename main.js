@@ -4,7 +4,6 @@ import { STATUS_CODES } from 'http'
 import { createHash } from 'crypto'
 import { createReadStream } from 'fs'
 import { stat as getStats } from 'fs/promises'
-import { parse as parseURL } from 'url'
 
 // REFERENCES
 // https://tools.ietf.org/html/rfc7230#section-3
@@ -146,7 +145,7 @@ export const staticHandler = (
       },
       response,
     }) {
-      const { pathname } = parseURL(url)
+      const { pathname } = new URL(url)
       const pathnameAlias = pathnameAliases.get(pathname) ?? pathname
       const file = {
         absolutePath: getAbsolutePath(directoryPath, pathnameAlias.substring(1)),
