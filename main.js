@@ -44,7 +44,6 @@ const DEFAULT_CONTENT_TYPE_BY_EXTENSIONS = new Map([
   ['.woff2', 'font/woff2'],
   ['.xml', 'application/xml'],
 ])
-const DEFAULT_PATHNAME_ALIASES = new Map([['/', '/index.html']])
 const DEFAULT_USE_WEAK_ETAGS = true
 
 const generateHeaders = ({ file }) => {
@@ -122,35 +121,20 @@ export const staticHandler = (
     contentTypeByExtensions = DEFAULT_CONTENT_TYPE_BY_EXTENSIONS,
     defaultContentType = DEFAULT_CONTENT_TYPE,
     directoryPath = DEFAULT_DIRECTORY_PATH,
-    pathnameAliases = DEFAULT_PATHNAME_ALIASES,
     useWeakETags = DEFAULT_USE_WEAK_ETAGS,
   } = {
     contentTypeByExtensions: DEFAULT_CONTENT_TYPE_BY_EXTENSIONS,
     defaultContentType: DEFAULT_CONTENT_TYPE,
     directoryPath: DEFAULT_DIRECTORY_PATH,
-    pathnameAliases: DEFAULT_PATHNAME_ALIASES,
     useWeakETags: DEFAULT_USE_WEAK_ETAGS,
   }
 ) => {
   return {
-    async handle({
-      request: {
-        headers: {
-          'if-match': ifMatch = null,
-          'if-modified-since': ifModifiedSince = null,
-          'if-none-match': ifNoneMatch = null,
-          'if-unmodified-since': ifUnmodifiedSince = null,
-          host,
-        },
-        url,
-      },
-      response,
-    }) {
-      const { pathname } = new URL(url, `protocol://${host}`) // WTF Node.js? https://nodejs.org/api/http.html#http_message_url
-      const pathnameAlias = pathnameAliases.get(pathname) ?? pathname
+    async handle({ request, response }) {
+      const { pathname } = new URL(request.url, `protocol://${request.headers.host}`) // WTF Node.js? https://nodejs.org/api/http.html#http_message_url
       const file = {
-        absolutePath: getAbsolutePath(directoryPath, pathnameAlias.substring(1)),
-        contentType: contentTypeByExtensions.get(getExtension(pathnameAlias)) ?? defaultContentType,
+        absolutePath: getAbsolutePath(directoryPath, pathname.substring(1)),
+        contentType: contentTypeByExtensions.get(getExtension(pathname)) ?? defaultContentType,
         isExists: true,
       }
       try {
@@ -177,13 +161,20 @@ export const staticHandler = (
         notFound({
           response,
         })
-      } else if ((ifMatch !== null && ifMatch !== file.eTag) || (ifMatch === null && ifUnmodifiedSince !== null && ifUnmodifiedSince < file.lastModified)) {
+      } else if (
+        ('if-match' in request.headers === true && request.headers['if-match'] !== file.eTag) ||
+        ('if-match' in request.headers === false &&
+          'if-unmodified-since' in request.headers === true &&
+          request.headers['if-unmodified-since'] < file.lastModified)
+      ) {
         preconditionFailed({
           response,
         })
       } else if (
-        (ifNoneMatch !== null && ifNoneMatch === file.eTag) ||
-        (ifNoneMatch === null && ifModifiedSince !== null && ifModifiedSince >= file.lastModified)
+        ('if-none-match' in request.headers === true && request.headers['if-none-match'] === file.eTag) ||
+        ('if-none-match' in request.headers === false &&
+          'if-modified-since' in request.headers === true &&
+          request.headers['if-modified-since'] >= file.lastModified)
       ) {
         notModified({
           file,
