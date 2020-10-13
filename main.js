@@ -1,9 +1,10 @@
+import { createReadStream, promises } from 'fs'
 import { resolve as getAbsolutePath, extname as getExtension } from 'path'
 
 import { STATUS_CODES } from 'http'
 import { createHash } from 'crypto'
-import { createReadStream } from 'fs'
-import { stat as getStats } from 'fs/promises'
+
+const { stat: getStats } = promises // Because fs/promises causes problems in old versions of Node.js
 
 // REFERENCES
 // https://tools.ietf.org/html/rfc7230#section-3
@@ -131,6 +132,10 @@ export const staticHandler = (
 ) => {
   return {
     async handle({ request, response }) {
+      let isAborted = false
+      request.once('aborted', () => {
+        isAborted = true
+      })
       const { pathname } = new URL(request.url, `protocol://${request.headers.host}`) // WTF Node.js? https://nodejs.org/api/http.html#http_message_url
       const file = {
         absolutePath: getAbsolutePath(directoryPath, pathname.substring(1)),
@@ -157,7 +162,9 @@ export const staticHandler = (
       } catch {
         file.isExists = false
       }
-      if (file.isExists === false) {
+      if (isAborted === true) {
+        return
+      } else if (file.isExists === false) {
         notFound({
           response,
         })
