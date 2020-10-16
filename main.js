@@ -65,9 +65,7 @@ const generateWeakETag = ({ stats: { mtime } }) => {
 const generateStrongETag = ({ file }) => {
   return new Promise((resolve) => {
     const hash = createHash('blake2b512')
-    createReadStream(file.absolutePath, {
-      encoding: 'binary',
-    })
+    createReadStream(file.absolutePath)
       .on('close', () => {
         const value = hash.read().toString('base64')
         resolve(`"${value}"`)
@@ -112,9 +110,7 @@ const ok = ({ file, response }) => {
       file,
     })
   )
-  createReadStream(file.absolutePath, {
-    encoding: 'binary',
-  }).pipe(response)
+  createReadStream(file.absolutePath).pipe(response)
 }
 
 export const staticHandler = (

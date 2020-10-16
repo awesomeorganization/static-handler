@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs'
 import { http } from '@awesomeorganization/servers'
+import { ok } from 'assert'
 import { staticHandler } from '../main.js'
-import { strictEqual } from 'assert'
 import undici from 'undici'
 
 const main = async () => {
@@ -19,21 +19,17 @@ const main = async () => {
     port,
   })
   {
+    const path = '/main.js'
     const { body } = await new undici.Client(`http://${host}:${port}`).request({
       method: 'GET',
-      path: '/main.js',
+      path,
     })
     const chunks = []
     body.on('data', (chunk) => {
       chunks.push(chunk)
     })
     body.on('end', async () => {
-      strictEqual(
-        Buffer.concat(chunks).toString('utf-8'),
-        await fs.readFile('./main.js', {
-          encoding: 'utf-8',
-        })
-      )
+      ok(Buffer.concat(chunks).equals(await fs.readFile('.' + path)))
     })
   }
   socket.unref()
