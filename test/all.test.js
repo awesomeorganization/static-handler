@@ -1,15 +1,22 @@
-/* eslint-disable node/no-unsupported-features/es-syntax */
+import { deepStrictEqual } from 'assert'
+import { http } from '@awesomeorganization/servers'
+import { readFile } from 'fs/promises'
+import { staticHandler } from '../main.js'
+import undici from 'undici'
+
+const data = (body) => {
+  return new Promise((resolve) => {
+    const chunks = []
+    body.on('data', (chunk) => {
+      chunks.push(chunk)
+    })
+    body.once('end', () => {
+      resolve(Buffer.concat(chunks))
+    })
+  })
+}
 
 const test = async () => {
-  const { staticHandler } = await import('../main.js')
-  const { deepStrictEqual } = await import('assert')
-  const { http } = await import('@awesomeorganization/servers')
-  const {
-    promises: { readFile },
-  } = await import('fs')
-  const {
-    default: { Client },
-  } = await import('undici')
   const { handle } = await staticHandler()
   http({
     listenOptions: {
@@ -17,23 +24,20 @@ const test = async () => {
       port: 0,
     },
     async onListening() {
-      const filename = 'main.js'
       const { address, port } = this.address()
-      const { body } = await new Client(`http://${address}:${port}`).request({
-        method: 'GET',
-        path: `/${filename}`,
-      })
-      const chunks = []
-      body.on('data', (chunk) => {
-        chunks.push(chunk)
-      })
-      body.once('end', async () => {
-        deepStrictEqual(Buffer.concat(chunks), await readFile(`./${filename}`))
-        this.close()
-      })
+      const client = new undici.Client(`http://${address}:${port}`)
+      {
+        const filename = 'main.js'
+        const { body } = await client.request({
+          method: 'GET',
+          path: `/${filename}`,
+        })
+        deepStrictEqual(await data(body), await readFile(`./${filename}`))
+      }
+      this.close()
     },
-    async onRequest(request, response) {
-      await handle({
+    onRequest(request, response) {
+      handle({
         request,
         response,
       })

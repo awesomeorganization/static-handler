@@ -23,7 +23,7 @@ import { REDIRECT_STATUS_CODES, rewriteHandler } from '@awesomeorganization/rewr
 import { http } from '@awesomeorganization/servers'
 import { staticHandler } from '@awesomeorganization/static-handler'
 
-const main = () => {
+const example = async () => {
   const rewriteMiddleware = rewriteHandler({
     rules: [
       {
@@ -37,7 +37,7 @@ const main = () => {
       },
     ],
   })
-  const staticMiddleware = staticHandler({
+  const staticMiddleware = await staticHandler({
     directoryPath: './static',
   })
   http({
@@ -45,13 +45,13 @@ const main = () => {
       host: '127.0.0.1',
       port: 3000,
     },
-    async onRequest(request, response) {
+    onRequest(request, response) {
       rewriteMiddleware.handle({
         request,
         response,
       })
       if (response.writableEnded === false) {
-        await staticMiddleware.handle({
+        staticMiddleware.handle({
           request,
           response,
         })
@@ -66,5 +66,5 @@ const main = () => {
   // http://127.0.0.1:3000/old-files/somefile.txt
 }
 
-main()
+example()
 ```

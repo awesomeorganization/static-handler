@@ -1,7 +1,7 @@
 {
   "name": "@awesomeorganization/static-handler",
   "description": "[ESM] The static handler for Node.js according to rfc7232, rfc7234 and whatwg",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "exports": "./main.js",
   "type": "module",
   "repository": "github:awesomeorganization/static-handler",
@@ -10,14 +10,14 @@
     "name": "sergeysedoy97"
   },
   "devDependencies": {
-    "@awesomeorganization/servers": "latest",
-    "eslint-config-prettier": "latest",
-    "eslint-plugin-node": "latest",
-    "undici": "latest"
+    "@awesomeorganization/servers": "0.2.2",
+    "eslint-config-prettier": "8.1.0",
+    "eslint-plugin-node": "11.1.0",
+    "undici": "3.3.3"
   },
   "peerDependencies": {
-    "eslint": "latest",
-    "prettier": "latest"
+    "eslint": "7.20.0",
+    "prettier": "2.2.1"
   },
   "peerDependenciesMeta": {
     "eslint": {
