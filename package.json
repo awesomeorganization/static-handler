@@ -1,14 +1,11 @@
 {
   "name": "@awesomeorganization/static-handler",
   "description": "[ESM] The static handler for Node.js according to rfc7232, rfc7234 and whatwg",
-  "version": "0.1.9",
-  "main": "main.js",
+  "version": "0.2.0",
+  "exports": "./main.js",
   "type": "module",
   "repository": "github:awesomeorganization/static-handler",
   "license": "MIT",
-  "engines": {
-    "node": ">=14.0.0"
-  },
   "author": {
     "name": "sergeysedoy97"
   },
