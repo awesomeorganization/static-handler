@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "dependencies": {
-    "@awesomeorganization/rewrite-handler": "0.1.3",
+    "@awesomeorganization/rewrite-handler": "0.1.5",
     "@awesomeorganization/servers": "0.2.2",
-    "@awesomeorganization/static-handler": "0.2.0"
+    "@awesomeorganization/static-handler": "0.2.1"
   }
 }

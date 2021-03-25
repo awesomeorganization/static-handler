@@ -1,6 +1,6 @@
 # static-handler
 
-:boom: [ESM] The static handler for Node.js according to rfc7232, rfc7234 and whatwg
+:boom: [ESM] The static handler for Node.js according to rfc7230, rfc7231, rfc7232, rfc7233, rfc7234 and whatwg
 
 ---
 
