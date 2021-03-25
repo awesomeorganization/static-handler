@@ -44,6 +44,7 @@ const DEFAULT_CONTENT_TYPE = 'application/octet-stream'
 const DEFAULT_DIRECTORY_PATH = '.'
 const DEFAULT_USE_WEAK_ETAGS = true
 const RANGE_HEADER_PREFIX = 'bytes='
+const SPACES_REGEXP = new RegExp('\\s+', 'g')
 
 export const staticHandler = async (
   {
@@ -171,6 +172,61 @@ export const staticHandler = async (
     )
     fs.createReadStream(file.absolutePath).pipe(response)
   }
+  const processRange = async ({ file, request }) => {
+    const rangeHeaderValue = request.headers.range.toLowerCase().replace(SPACES_REGEXP, '')
+    if (rangeHeaderValue.startsWith(RANGE_HEADER_PREFIX) === false) {
+      return undefined
+    }
+    const fileHandle = await fs.promises.open(file.absolutePath)
+    const ranges = rangeHeaderValue.substring(RANGE_HEADER_PREFIX.length).split(',')
+    const boundary = Math.random().toString(32).substring(2)
+    const chunks = []
+    for (const range of ranges) {
+      const dividerIndex = range.indexOf('-')
+      if (dividerIndex === -1) {
+        return undefined
+      }
+      let start = range.substring(0, dividerIndex)
+      let end = range.substring(dividerIndex + 1)
+      start = start.length === 0 ? Number.NaN : parseInt(start, 10)
+      end = end.length === 0 ? Number.NaN : parseInt(end, 10)
+      if (Number.isNaN(start) === true) {
+        if (Number.isNaN(end) === true) {
+          return undefined
+        }
+        start = file.contentLength - 1 - end
+        end = file.contentLength - 1
+      } else if (Number.isNaN(end) === true) {
+        end = file.contentLength - 1
+      }
+      if (start < 0 || end <= 0 || start >= end || end >= file.contentLength) {
+        return undefined
+      }
+      const buffer = Buffer.alloc(end - start)
+      fileHandle.read({
+        buffer,
+        position: start,
+      })
+      chunks.push(
+        Buffer.from(`--${boundary}`),
+        Buffer.from('\r\n'),
+        Buffer.from(`Content-Type: ${file.contentType}`),
+        Buffer.from('\r\n'),
+        Buffer.from(`Content-Range: bytes ${start}-${end}/${file.contentLength}`),
+        Buffer.from('\r\n'),
+        Buffer.from('\r\n'),
+        buffer,
+        Buffer.from('\r\n')
+      )
+    }
+    await fileHandle.close()
+    chunks.push(Buffer.from(`--${boundary}--`), Buffer.from('\r\n'))
+    const content = Buffer.concat(chunks)
+    return {
+      boundary,
+      content,
+    }
+  }
   const handle = async ({ request, response }) => {
     const pathname = request.url.includes('?') === true ? request.url.substring(0, request.url.indexOf('?')) : request.url
     const file = {
@@ -233,73 +289,19 @@ export const staticHandler = async (
         'if-range' in request.headers === false) &&
       'range' in request.headers === true
     ) {
-      if (request.headers.range.startsWith(RANGE_HEADER_PREFIX) === false) {
+      const options = await processRange({
+        file,
+        request,
+      })
+      if (options === undefined) {
         requestedRangeNotSatisfiable({
           request,
           response,
         })
         return
       }
-      const fileHandle = await fs.promises.open(file.absolutePath)
-      const ranges = request.headers.range.substring(RANGE_HEADER_PREFIX.length).split(', ')
-      const boundary = Math.random().toString(32).substring(2)
-      const chunks = []
-      for (const range of ranges) {
-        let [start, end] = range.split('-')
-        if (end === undefined) {
-          requestedRangeNotSatisfiable({
-            request,
-            response,
-          })
-          return
-        }
-        if (start.length === 0) {
-          if (end.length === 0) {
-            requestedRangeNotSatisfiable({
-              request,
-              response,
-            })
-            return
-          }
-          start = file.contentLength - parseInt(end, 10)
-          end = file.contentLength
-        } else if (end.length === 0) {
-          start = parseInt(start, 10)
-          end = file.contentLength
-        } else {
-          start = parseInt(start, 10)
-          end = parseInt(end, 10)
-        }
-        if (start < 0 || end < 0 || start >= end || end > file.contentLength) {
-          requestedRangeNotSatisfiable({
-            request,
-            response,
-          })
-          return
-        }
-        const buffer = Buffer.alloc(end - start)
-        fileHandle.read({
-          buffer,
-          position: start,
-        })
-        chunks.push(
-          Buffer.from(`--${boundary}`),
-          Buffer.from('\r\n'),
-          Buffer.from(`Content-Type: ${file.contentType}`),
-          Buffer.from('\r\n'),
-          Buffer.from(`Content-Range: bytes ${start}-${end}/${file.contentLength}`),
-          Buffer.from('\r\n'),
-          Buffer.from('\r\n'),
-          buffer,
-          Buffer.from('\r\n')
-        )
-      }
-      await fileHandle.close()
-      chunks.push(Buffer.from(`--${boundary}--`), Buffer.from('\r\n'))
-      const content = Buffer.concat(chunks)
       partialContent({
-        boundary,
-        content,
+        ...options,
         file,
         request,
         response,
