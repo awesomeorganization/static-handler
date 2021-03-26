@@ -74,6 +74,7 @@ const DEFAULT_CONTENT_TYPE_BY_EXTENSIONS = new Map([
 ])
 const DEFAULT_CONTENT_TYPE = 'application/octet-stream'
 const DEFAULT_DIRECTORY_PATH = '.'
+const DEFAULT_USE_INDEX_PAGE = true
 const DEFAULT_USE_WEAK_ETAGS = true
 const RANGE_HEADER_PREFIX = 'bytes='
 const SPACES_REGEXP = new RegExp('\\s+', 'g')
@@ -83,11 +84,13 @@ export const staticHandler = async (
     contentTypeByExtensions = DEFAULT_CONTENT_TYPE_BY_EXTENSIONS,
     defaultContentType = DEFAULT_CONTENT_TYPE,
     directoryPath = DEFAULT_DIRECTORY_PATH,
+    useIndexPage = DEFAULT_USE_INDEX_PAGE,
     useWeakETags = DEFAULT_USE_WEAK_ETAGS,
   } = {
     contentTypeByExtensions: DEFAULT_CONTENT_TYPE_BY_EXTENSIONS,
     defaultContentType: DEFAULT_CONTENT_TYPE,
     directoryPath: DEFAULT_DIRECTORY_PATH,
+    useIndexPage: DEFAULT_USE_INDEX_PAGE,
     useWeakETags: DEFAULT_USE_WEAK_ETAGS,
   }
 ) => {
@@ -214,7 +217,7 @@ export const staticHandler = async (
     )
     fs.createReadStream(absoluteFilepath).pipe(response)
   }
-  const index = ({ content, eTag, lastModified, request, response }) => {
+  const indexPage = ({ content, eTag, lastModified, request, response }) => {
     if (request.aborted === true) {
       return
     }
@@ -229,6 +232,27 @@ export const staticHandler = async (
         })
       )
       .end(content)
+  }
+  const processDirectory = async ({ absoluteFilepath, relativeFilepath }) => {
+    const entities = await fs.promises.readdir(absoluteFilepath)
+    const content = [
+      '<!DOCTYPE html>',
+      '<html>',
+      '<head>',
+      '<meta charset="utf-8" />',
+      '</head>',
+      '<body>',
+      '<ul>',
+      ...entities.map((entity) => {
+        return `<li><a href="${relativeFilepath === '/' ? '' : relativeFilepath}/${entity}">${entity}</a></li>`
+      }),
+      '</ul>',
+      '</body>',
+      '</html>',
+    ].join('')
+    return {
+      content,
+    }
   }
   const processRange = async ({ absoluteFilepath, contentLength, contentType, request }) => {
     const rangeHeaderValue = request.headers.range.toLowerCase().replace(SPACES_REGEXP, '')
@@ -301,29 +325,30 @@ export const staticHandler = async (
       })
       return
     }
+    const isDirectory = stats.isDirectory() === true
+    const eTag =
+      useWeakETags === true || isDirectory === true
+        ? generateWeakETag({
+            stats,
+          })
+        : await generateStrongETag({
+            absoluteFilepath,
+          })
     const lastModified = stats.mtime.toUTCString()
-    if (stats.isDirectory() === true) {
-      const entities = await fs.promises.readdir(absoluteFilepath)
-      const content = [
-        '<!DOCTYPE html>',
-        '<html>',
-        '<head>',
-        '<meta charset="utf-8" />',
-        '</head>',
-        '<body>',
-        '<ul>',
-        ...entities.map((entity) => {
-          return `<li><a href="${relativeFilepath === '/' ? '' : relativeFilepath}/${entity}">${entity}</a></li>`
-        }),
-        '</ul>',
-        '</body>',
-        '</html>',
-      ].join('')
-      const eTag = generateWeakETag({
-        stats,
+    if (isDirectory === true) {
+      if (useIndexPage === false) {
+        notFound({
+          request,
+          response,
+        })
+        return
+      }
+      const options = await processDirectory({
+        absoluteFilepath,
+        relativeFilepath,
       })
-      index({
-        content,
+      indexPage({
+        ...options,
         eTag,
         lastModified,
         request,
@@ -333,14 +358,6 @@ export const staticHandler = async (
     }
     const contentLength = stats.size
     const contentType = contentTypeByExtensions.get(path.extname(relativeFilepath)) ?? defaultContentType
-    const eTag =
-      useWeakETags === true
-        ? generateWeakETag({
-            stats,
-          })
-        : await generateStrongETag({
-            absoluteFilepath,
-          })
     if (
       ('if-match' in request.headers === true && request.headers['if-match'] !== eTag) ||
       ('if-match' in request.headers === false && 'if-unmodified-since' in request.headers === true && request.headers['if-unmodified-since'] < lastModified)
