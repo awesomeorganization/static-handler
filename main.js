@@ -76,8 +76,47 @@ const DEFAULT_CONTENT_TYPE = 'application/octet-stream'
 const DEFAULT_DIRECTORY_PATH = '.'
 const DEFAULT_USE_INDEX_PAGE = true
 const DEFAULT_USE_WEAK_ETAGS = true
-const RANGE_HEADER_PREFIX = 'bytes='
+const RANGE_UNIT = 'bytes'
 const SPACES_REGEXP = new RegExp('\\s+', 'g')
+
+export const parseRange = ({ range, size }) => {
+  const rangeWithoutSpaces = range.replace(SPACES_REGEXP, '')
+  const unitDividerIndex = rangeWithoutSpaces.indexOf('=')
+  if (unitDividerIndex === -1) {
+    return undefined
+  }
+  const unit = rangeWithoutSpaces.substring(0, unitDividerIndex)
+  const rangePairs = rangeWithoutSpaces.substring(unitDividerIndex + 1).split(',')
+  const ranges = []
+  for (const rangePair of rangePairs) {
+    const valuesDividerIndex = rangePair.indexOf('-')
+    if (valuesDividerIndex === -1) {
+      return undefined
+    }
+    let start = parseInt(rangePair.substring(0, valuesDividerIndex), 10)
+    let end = parseInt(rangePair.substring(valuesDividerIndex + 1), 10)
+    if (Number.isNaN(start) === true) {
+      if (Number.isNaN(end) === true) {
+        return undefined
+      }
+      start = size - 1 - end
+      end = size - 1
+    } else if (Number.isNaN(end) === true) {
+      end = size - 1
+    }
+    if (start < 0 || end <= 0 || start >= end || end >= size) {
+      return undefined
+    }
+    ranges.push({
+      end,
+      start,
+    })
+  }
+  return {
+    ranges,
+    unit,
+  }
+}
 
 export const staticHandler = async (
   {
@@ -97,15 +136,27 @@ export const staticHandler = async (
   const crypto = await import('crypto')
   const fs = await import('fs')
   const path = await import('path')
-  const generateHeaders = ({ contentLength, contentType, eTag, lastModified }) => {
-    return {
-      'Accept-Ranges': 'bytes',
-      'Cache-Control': 'public',
-      'Content-Length': contentLength,
-      'Content-Type': contentType,
-      'ETag': eTag,
-      'Last-Modified': lastModified,
+  const generateHeaders = ({
+    acceptRanges = RANGE_UNIT,
+    cacheControl = 'public',
+    contentLength = 0,
+    contentType = DEFAULT_CONTENT_TYPE,
+    eTag,
+    lastModified,
+  }) => {
+    const headers = [
+      ['Accept-Ranges', acceptRanges],
+      ['Cache-Control', cacheControl],
+      ['Content-Length', contentLength],
+      ['Content-Type', contentType],
+    ]
+    if (eTag !== undefined) {
+      headers.push(['ETag', eTag])
     }
+    if (lastModified !== undefined) {
+      headers.push(['Last-Modified', lastModified])
+    }
+    return headers
   }
   const generateWeakETag = ({ stats: { mtime } }) => {
     const value = mtime.valueOf().toString(32)
@@ -129,9 +180,13 @@ export const staticHandler = async (
       return
     }
     response
-      .writeHead(STATUS_NOT_FOUND, {
-        'Cache-Control': 'no-store',
-      })
+      .writeHead(
+        STATUS_NOT_FOUND,
+        generateHeaders({
+          acceptRanges: 'none',
+          cacheControl: 'no-store',
+        })
+      )
       .end()
   }
   const preconditionFailed = ({ request, response }) => {
@@ -139,9 +194,13 @@ export const staticHandler = async (
       return
     }
     response
-      .writeHead(STATUS_PRECONDITION_FAILED, {
-        'Cache-Control': 'no-store',
-      })
+      .writeHead(
+        STATUS_PRECONDITION_FAILED,
+        generateHeaders({
+          acceptRanges: 'none',
+          cacheControl: 'no-store',
+        })
+      )
       .end()
   }
   const notModified = ({ contentLength, contentType, eTag, lastModified, request, response }) => {
@@ -165,9 +224,13 @@ export const staticHandler = async (
       return
     }
     response
-      .writeHead(STATUS_REQUESTED_RANGE_NOT_SATISFIABLE, {
-        'Cache-Control': 'no-store',
-      })
+      .writeHead(
+        STATUS_REQUESTED_RANGE_NOT_SATISFIABLE,
+        generateHeaders({
+          acceptRanges: 'none',
+          cacheControl: 'no-store',
+        })
+      )
       .end()
   }
   const partialContent = ({ boundary, content, eTag, lastModified, request, response }) => {
@@ -225,6 +288,7 @@ export const staticHandler = async (
       .writeHead(
         STATUS_OK,
         generateHeaders({
+          acceptRanges: 'none',
           contentLength: content.length,
           contentType: 'text/html',
           eTag,
@@ -255,35 +319,21 @@ export const staticHandler = async (
     }
   }
   const processRange = async ({ absoluteFilepath, contentLength, contentType, request }) => {
-    const rangeHeaderValue = request.headers.range.toLowerCase().replace(SPACES_REGEXP, '')
-    if (rangeHeaderValue.startsWith(RANGE_HEADER_PREFIX) === false) {
+    const options = parseRange({
+      range: request.headers.range,
+      size: contentLength,
+    })
+    if (options === undefined) {
+      return undefined
+    }
+    const { unit, ranges } = options
+    if (unit !== RANGE_UNIT) {
       return undefined
     }
     const fileHandle = await fs.promises.open(absoluteFilepath)
-    const ranges = rangeHeaderValue.substring(RANGE_HEADER_PREFIX.length).split(',')
     const boundary = Math.random().toString(32).substring(2)
     const chunks = []
-    for (const range of ranges) {
-      const dividerIndex = range.indexOf('-')
-      if (dividerIndex === -1) {
-        return undefined
-      }
-      let start = range.substring(0, dividerIndex)
-      let end = range.substring(dividerIndex + 1)
-      start = start.length === 0 ? Number.NaN : parseInt(start, 10)
-      end = end.length === 0 ? Number.NaN : parseInt(end, 10)
-      if (Number.isNaN(start) === true) {
-        if (Number.isNaN(end) === true) {
-          return undefined
-        }
-        start = contentLength - 1 - end
-        end = contentLength - 1
-      } else if (Number.isNaN(end) === true) {
-        end = contentLength - 1
-      }
-      if (start < 0 || end <= 0 || start >= end || end >= contentLength) {
-        return undefined
-      }
+    for (const { end, start } of ranges) {
       const buffer = Buffer.alloc(end - start)
       fileHandle.read({
         buffer,
@@ -343,12 +393,12 @@ export const staticHandler = async (
         })
         return
       }
-      const options = await processDirectory({
+      const { content } = await processDirectory({
         absoluteFilepath,
         relativeFilepath,
       })
       indexPage({
-        ...options,
+        content,
         eTag,
         lastModified,
         request,
@@ -399,8 +449,10 @@ export const staticHandler = async (
         })
         return
       }
+      const { boundary, content } = options
       partialContent({
-        ...options,
+        boundary,
+        content,
         eTag,
         lastModified,
         request,
