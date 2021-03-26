@@ -24,21 +24,53 @@ const STATUS_NOT_FOUND = 404
 const STATUS_PRECONDITION_FAILED = 412
 const STATUS_REQUESTED_RANGE_NOT_SATISFIABLE = 416
 const DEFAULT_CONTENT_TYPE_BY_EXTENSIONS = new Map([
+  ['.aac', 'audio/aac'],
+  ['.bmp', 'image/bmp'],
+  ['.cjs', 'application/javascript'],
   ['.css', 'text/css'],
+  ['.csv', 'text/csv'],
+  ['.gif', 'image/gif'],
+  ['.htm', 'text/html'],
   ['.html', 'text/html'],
+  ['.ics', 'text/calendar'],
   ['.jpeg', 'image/jpeg'],
   ['.jpg', 'image/jpeg'],
   ['.js', 'application/javascript'],
   ['.json', 'application/json'],
+  ['.jsonld', 'application/ld+json'],
+  ['.jsx', 'application/javascript'],
+  ['.md', 'text/markdown'],
+  ['.mid', 'audio/midi'],
+  ['.midi', 'audio/midi'],
+  ['.mjs', 'application/javascript'],
+  ['.mp3', 'audio/mpeg'],
+  ['.mp4', 'video/mp4'],
+  ['.mpeg', 'video/mpeg'],
+  ['.oga', 'audio/ogg'],
+  ['.ogv', 'video/ogg'],
+  ['.ogx', 'application/ogg'],
+  ['.opus', 'audio/opus'],
   ['.otf', 'font/otf'],
   ['.pdf', 'application/pdf'],
   ['.png', 'image/png'],
+  ['.rtf', 'application/rtf'],
   ['.svg', 'image/svg+xml'],
+  ['.tif', 'image/tiff'],
+  ['.tiff', 'image/tiff'],
+  ['.toml', 'application/toml'],
+  ['.ts', 'video/mp2t'],
   ['.ttf', 'font/ttf'],
   ['.txt', 'text/plain'],
+  ['.wav', 'audio/wav'],
+  ['.weba', 'audio/webm'],
+  ['.webm', 'video/webm'],
+  ['.webp', 'image/webp'],
   ['.woff', 'font/woff'],
   ['.woff2', 'font/woff2'],
+  ['.xhtml', 'application/xhtml+xml'],
   ['.xml', 'application/xml'],
+  ['.yaml', 'application/yaml'],
+  ['.zip', 'application/zip'],
 ])
 const DEFAULT_CONTENT_TYPE = 'application/octet-stream'
 const DEFAULT_DIRECTORY_PATH = '.'
@@ -62,24 +94,24 @@ export const staticHandler = async (
   const crypto = await import('crypto')
   const fs = await import('fs')
   const path = await import('path')
-  const generateHeadersFromFile = ({ file }) => {
+  const generateHeaders = ({ contentLength, contentType, eTag, lastModified }) => {
     return {
       'Accept-Ranges': 'bytes',
       'Cache-Control': 'public',
-      'Content-Length': file.contentLength,
-      'Content-Type': file.contentType,
-      'ETag': file.eTag,
-      'Last-Modified': file.lastModified,
+      'Content-Length': contentLength,
+      'Content-Type': contentType,
+      'ETag': eTag,
+      'Last-Modified': lastModified,
     }
   }
   const generateWeakETag = ({ stats: { mtime } }) => {
     const value = mtime.valueOf().toString(32)
     return `W/"${value}"`
   }
-  const generateStrongETag = ({ file }) => {
+  const generateStrongETag = ({ absoluteFilepath }) => {
     return new Promise((resolve) => {
       const hash = crypto.createHash('blake2b512')
-      fs.createReadStream(file.absolutePath, {
+      fs.createReadStream(absoluteFilepath, {
         emitClose: true,
       })
         .on('close', () => {
@@ -109,15 +141,18 @@ export const staticHandler = async (
       })
       .end()
   }
-  const notModified = ({ file, request, response }) => {
+  const notModified = ({ contentLength, contentType, eTag, lastModified, request, response }) => {
     if (request.aborted === true) {
       return
     }
     response
       .writeHead(
         STATUS_NOT_MODIFIED,
-        generateHeadersFromFile({
-          file,
+        generateHeaders({
+          contentLength,
+          contentType,
+          eTag,
+          lastModified,
         })
       )
       .end()
@@ -132,52 +167,75 @@ export const staticHandler = async (
       })
       .end()
   }
-  const partialContent = ({ boundary, content, file, request, response }) => {
+  const partialContent = ({ boundary, content, eTag, lastModified, request, response }) => {
     if (request.aborted === true) {
       return
     }
     response
-      .writeHead(STATUS_PARTIAL_CONTENT, {
-        'Accept-Ranges': 'bytes',
-        'Cache-Control': 'public',
-        'Content-Length': content.length,
-        'Content-Type': `multipart/byteranges; boundary=${boundary}`,
-        'ETag': file.eTag,
-        'Last-Modified': file.lastModified,
-      })
+      .writeHead(
+        STATUS_PARTIAL_CONTENT,
+        generateHeaders({
+          contentLength: content.length,
+          contentType: `multipart/byteranges; boundary=${boundary}`,
+          eTag,
+          lastModified,
+        })
+      )
       .end(content)
   }
-  const noContent = ({ file, request, response }) => {
+  const noContent = ({ contentLength, contentType, eTag, lastModified, request, response }) => {
     if (request.aborted === true) {
       return
     }
     response
       .writeHead(
         STATUS_NO_CONTENT,
-        generateHeadersFromFile({
-          file,
+        generateHeaders({
+          contentLength,
+          contentType,
+          eTag,
+          lastModified,
         })
       )
       .end()
   }
-  const ok = ({ file, request, response }) => {
+  const ok = ({ absoluteFilepath, contentLength, contentType, eTag, lastModified, request, response }) => {
     if (request.aborted === true) {
       return
     }
     response.writeHead(
       STATUS_OK,
-      generateHeadersFromFile({
-        file,
+      generateHeaders({
+        contentLength,
+        contentType,
+        eTag,
+        lastModified,
       })
     )
-    fs.createReadStream(file.absolutePath).pipe(response)
+    fs.createReadStream(absoluteFilepath).pipe(response)
   }
-  const processRange = async ({ file, request }) => {
+  const index = ({ content, eTag, lastModified, request, response }) => {
+    if (request.aborted === true) {
+      return
+    }
+    response
+      .writeHead(
+        STATUS_OK,
+        generateHeaders({
+          contentLength: content.length,
+          contentType: 'text/html',
+          eTag,
+          lastModified,
+        })
+      )
+      .end(content)
+  }
+  const processRange = async ({ absoluteFilepath, contentLength, contentType, request }) => {
     const rangeHeaderValue = request.headers.range.toLowerCase().replace(SPACES_REGEXP, '')
     if (rangeHeaderValue.startsWith(RANGE_HEADER_PREFIX) === false) {
       return undefined
     }
-    const fileHandle = await fs.promises.open(file.absolutePath)
+    const fileHandle = await fs.promises.open(absoluteFilepath)
     const ranges = rangeHeaderValue.substring(RANGE_HEADER_PREFIX.length).split(',')
     const boundary = Math.random().toString(32).substring(2)
     const chunks = []
@@ -194,12 +252,12 @@ export const staticHandler = async (
         if (Number.isNaN(end) === true) {
           return undefined
         }
-        start = file.contentLength - 1 - end
-        end = file.contentLength - 1
+        start = contentLength - 1 - end
+        end = contentLength - 1
       } else if (Number.isNaN(end) === true) {
-        end = file.contentLength - 1
+        end = contentLength - 1
       }
-      if (start < 0 || end <= 0 || start >= end || end >= file.contentLength) {
+      if (start < 0 || end <= 0 || start >= end || end >= contentLength) {
         return undefined
       }
       const buffer = Buffer.alloc(end - start)
@@ -210,9 +268,9 @@ export const staticHandler = async (
       chunks.push(
         Buffer.from(`--${boundary}`),
         Buffer.from('\r\n'),
-        Buffer.from(`Content-Type: ${file.contentType}`),
+        Buffer.from(`Content-Type: ${contentType}`),
         Buffer.from('\r\n'),
-        Buffer.from(`Content-Range: bytes ${start}-${end}/${file.contentLength}`),
+        Buffer.from(`Content-Range: bytes ${start}-${end}/${contentLength}`),
         Buffer.from('\r\n'),
         Buffer.from('\r\n'),
         buffer,
@@ -228,44 +286,64 @@ export const staticHandler = async (
     }
   }
   const handle = async ({ request, response }) => {
-    const pathname = request.url.includes('?') === true ? request.url.substring(0, request.url.indexOf('?')) : request.url
-    const file = {
-      absolutePath: path.resolve(directoryPath, pathname.substring(1)),
-      contentType: contentTypeByExtensions.get(path.extname(pathname)) ?? defaultContentType,
-      isExists: true,
-    }
+    const dividerIndex = request.url.indexOf('?')
+    const relativeFilepath = dividerIndex === -1 ? request.url : request.url.substring(0, dividerIndex)
+    const absoluteFilepath = path.resolve(directoryPath, relativeFilepath.substring(1))
+    let stats
     try {
-      const stats = await fs.promises.stat(file.absolutePath)
-      if (stats.isFile() === false) {
-        file.isExists = false
-      } else {
-        file.contentLength = stats.size
-        file.lastModified = stats.mtime.toUTCString()
-        if (useWeakETags === true) {
-          file.eTag = generateWeakETag({
-            stats,
-          })
-        } else {
-          file.eTag = await generateStrongETag({
-            file,
-          })
-        }
-      }
-    } catch {
-      file.isExists = false
-    }
-    if (file.isExists === false) {
+      stats = await fs.promises.stat(absoluteFilepath)
+      // eslint-disable-next-line no-empty
+    } catch {}
+    if (stats === undefined) {
       notFound({
         request,
         response,
       })
       return
     }
+    const lastModified = stats.mtime.toUTCString()
+    if (stats.isDirectory() === true) {
+      const entities = await fs.promises.readdir(absoluteFilepath)
+      const content = [
+        '<!DOCTYPE html>',
+        '<html>',
+        '<head>',
+        '<meta charset="utf-8" />',
+        '</head>',
+        '<body>',
+        '<ul>',
+        ...entities.map((entity) => {
+          return `<li><a href="${relativeFilepath === '/' ? '' : relativeFilepath}/${entity}">${entity}</a></li>`
+        }),
+        '</ul>',
+        '</body>',
+        '</html>',
+      ].join('')
+      const eTag = generateWeakETag({
+        stats,
+      })
+      index({
+        content,
+        eTag,
+        lastModified,
+        request,
+        response,
+      })
+      return
+    }
+    const contentLength = stats.size
+    const contentType = contentTypeByExtensions.get(path.extname(relativeFilepath)) ?? defaultContentType
+    const eTag =
+      useWeakETags === true
+        ? generateWeakETag({
+            stats,
+          })
+        : await generateStrongETag({
+            absoluteFilepath,
+          })
     if (
-      ('if-match' in request.headers === true && request.headers['if-match'] !== file.eTag) ||
-      ('if-match' in request.headers === false &&
-        'if-unmodified-since' in request.headers === true &&
-        request.headers['if-unmodified-since'] < file.lastModified)
+      ('if-match' in request.headers === true && request.headers['if-match'] !== eTag) ||
+      ('if-match' in request.headers === false && 'if-unmodified-since' in request.headers === true && request.headers['if-unmodified-since'] < lastModified)
     ) {
       preconditionFailed({
         response,
@@ -273,24 +351,28 @@ export const staticHandler = async (
       return
     }
     if (
-      ('if-none-match' in request.headers === true && request.headers['if-none-match'] === file.eTag) ||
-      ('if-none-match' in request.headers === false &&
-        'if-modified-since' in request.headers === true &&
-        request.headers['if-modified-since'] >= file.lastModified)
+      ('if-none-match' in request.headers === true && request.headers['if-none-match'] === eTag) ||
+      ('if-none-match' in request.headers === false && 'if-modified-since' in request.headers === true && request.headers['if-modified-since'] >= lastModified)
     ) {
       notModified({
-        file,
+        contentLength,
+        contentType,
+        eTag,
+        lastModified,
+        request,
         response,
       })
       return
     }
     if (
-      (('if-range' in request.headers === true && (request.headers['if-range'] === file.eTag || request.headers['if-range'] === file.lastModified)) ||
+      (('if-range' in request.headers === true && (request.headers['if-range'] === eTag || request.headers['if-range'] === lastModified)) ||
         'if-range' in request.headers === false) &&
       'range' in request.headers === true
     ) {
       const options = await processRange({
-        file,
+        absoluteFilepath,
+        contentLength,
+        contentType,
         request,
       })
       if (options === undefined) {
@@ -302,13 +384,14 @@ export const staticHandler = async (
       }
       partialContent({
         ...options,
-        file,
+        eTag,
+        lastModified,
         request,
         response,
       })
       return
     }
-    if (file.contentLength === 0) {
+    if (contentLength === 0) {
       noContent({
         request,
         response,
@@ -316,7 +399,11 @@ export const staticHandler = async (
       return
     }
     ok({
-      file,
+      absoluteFilepath,
+      contentLength,
+      contentType,
+      eTag,
+      lastModified,
       request,
       response,
     })
