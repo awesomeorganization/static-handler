@@ -6,6 +6,6 @@
   "dependencies": {
     "@awesomeorganization/rewrite-handler": "0.1.5",
     "@awesomeorganization/servers": "0.2.2",
-    "@awesomeorganization/static-handler": "0.2.5"
+    "@awesomeorganization/static-handler": "0.2.6"
   }
 }

@@ -78,6 +78,7 @@ const DEFAULT_USE_INDEX_PAGE = true
 const DEFAULT_USE_WEAK_ETAGS = true
 const RANGE_UNIT = 'bytes'
 const SPACES_REGEXP = new RegExp('\\s+', 'g')
+const CRLF = Buffer.from('\r\n')
 
 export const parseRange = ({ range, size }) => {
   const rangeWithoutSpaces = range.replace(SPACES_REGEXP, '')
@@ -331,7 +332,7 @@ export const staticHandler = async (
       return undefined
     }
     const fileHandle = await fs.promises.open(absoluteFilepath)
-    const boundary = Math.random().toString(32).substring(2)
+    const boundary = Math.random().toString(36).substring(2)
     const chunks = []
     for (const { end, start } of ranges) {
       const buffer = Buffer.alloc(end - start)
@@ -341,18 +342,18 @@ export const staticHandler = async (
       })
       chunks.push(
         Buffer.from(`--${boundary}`),
-        Buffer.from('\r\n'),
+        CRLF,
         Buffer.from(`Content-Type: ${contentType}`),
-        Buffer.from('\r\n'),
+        CRLF,
         Buffer.from(`Content-Range: bytes ${start}-${end}/${contentLength}`),
-        Buffer.from('\r\n'),
-        Buffer.from('\r\n'),
+        CRLF,
+        CRLF,
         buffer,
-        Buffer.from('\r\n')
+        CRLF
       )
     }
     await fileHandle.close()
-    chunks.push(Buffer.from(`--${boundary}--`), Buffer.from('\r\n'))
+    chunks.push(Buffer.from(`--${boundary}--`), CRLF)
     const content = Buffer.concat(chunks)
     return {
       boundary,
