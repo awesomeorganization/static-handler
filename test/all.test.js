@@ -1,6 +1,9 @@
+/* eslint-disable node/no-unsupported-features/es-syntax */
+
 import { deepStrictEqual } from 'assert'
 import { http } from '@awesomeorganization/servers'
 import { readFile } from 'fs/promises'
+import { resolve } from 'path'
 import { staticHandler } from '../main.js'
 import undici from 'undici'
 
@@ -17,7 +20,9 @@ const data = (body) => {
 }
 
 const test = async () => {
-  const { handle } = await staticHandler()
+  const { handle } = await staticHandler({
+    directoryPath: resolve(process.argv[1], '..', '..'),
+  })
   http({
     listenOptions: {
       host: '127.0.0.1',
@@ -32,8 +37,9 @@ const test = async () => {
           method: 'GET',
           path: `/${filename}`,
         })
-        deepStrictEqual(await data(body), await readFile(`./${filename}`))
+        deepStrictEqual(await data(body), await readFile(resolve(process.argv[1], '..', '..', filename)))
       }
+      await client.close()
       this.close()
     },
     onRequest(request, response) {

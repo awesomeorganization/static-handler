@@ -1,3 +1,5 @@
+/* eslint-disable node/no-unsupported-features/es-syntax */
+
 import { REDIRECT_STATUS_CODES, rewriteHandler } from '@awesomeorganization/rewrite-handler'
 
 import { http } from '@awesomeorganization/servers'
@@ -30,12 +32,13 @@ const example = async () => {
         request,
         response,
       })
-      if (response.writableEnded === false) {
-        staticMiddleware.handle({
-          request,
-          response,
-        })
+      if (response.writableEnded === true) {
+        return
       }
+      staticMiddleware.handle({
+        request,
+        response,
+      })
     },
   })
   // TRY

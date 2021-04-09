@@ -1,7 +1,7 @@
 {
   "name": "@awesomeorganization/static-handler",
   "description": "[ESM] The static handler for Node.js according to rfc7230, rfc7231, rfc7232, rfc7233, rfc7234 and whatwg",
-  "version": "0.2.7",
+  "version": "1.0.0",
   "exports": "./main.js",
   "type": "module",
   "repository": "github:awesomeorganization/static-handler",

@@ -50,12 +50,13 @@ const example = async () => {
         request,
         response,
       })
-      if (response.writableEnded === false) {
-        staticMiddleware.handle({
-          request,
-          response,
-        })
+      if (response.writableEnded === true) {
+        return
       }
+      staticMiddleware.handle({
+        request,
+        response,
+      })
     },
   })
   // TRY

@@ -160,7 +160,7 @@ export const staticHandler = async (
     return headers
   }
   const generateWeakETag = ({ stats: { mtime } }) => {
-    const value = mtime.valueOf().toString(32)
+    const value = mtime.valueOf().toString(36)
     return `W/"${value}"`
   }
   const generateStrongETag = ({ absoluteFilepath }) => {
@@ -332,7 +332,7 @@ export const staticHandler = async (
       return undefined
     }
     const fileHandle = await fs.promises.open(absoluteFilepath)
-    const boundary = Math.random().toString(36).substring(2)
+    const boundary = Date.now().toString(36)
     const chunks = []
     for (const { end, start } of ranges) {
       const buffer = Buffer.alloc(end - start)
@@ -361,6 +361,9 @@ export const staticHandler = async (
     }
   }
   const handle = async ({ request, response }) => {
+    if (request.aborted === true) {
+      return
+    }
     const dividerIndex = request.url.indexOf('?')
     const relativeFilepath = dividerIndex === -1 ? request.url : request.url.substring(0, dividerIndex)
     const absoluteFilepath = path.resolve(directoryPath, relativeFilepath.substring(1))
