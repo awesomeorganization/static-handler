@@ -17,7 +17,7 @@
 // https://tools.ietf.org/html/rfc7231#section-5.3
 
 const STATUS_OK = 200
-const STATUS_NO_CONTENT = 200
+const STATUS_NO_CONTENT = 204
 const STATUS_PARTIAL_CONTENT = 206
 const STATUS_NOT_MODIFIED = 304
 const STATUS_NOT_FOUND = 404
@@ -177,7 +177,7 @@ export const staticHandler = async (
     })
   }
   const notFound = ({ request, response }) => {
-    if (request.aborted === true) {
+    if (request.aborted === true || response.writableEnded === true) {
       return
     }
     response
@@ -191,7 +191,7 @@ export const staticHandler = async (
       .end()
   }
   const preconditionFailed = ({ request, response }) => {
-    if (request.aborted === true) {
+    if (request.aborted === true || response.writableEnded === true) {
       return
     }
     response
@@ -205,7 +205,7 @@ export const staticHandler = async (
       .end()
   }
   const notModified = ({ contentLength, contentType, eTag, lastModified, request, response }) => {
-    if (request.aborted === true) {
+    if (request.aborted === true || response.writableEnded === true) {
       return
     }
     response
@@ -221,7 +221,7 @@ export const staticHandler = async (
       .end()
   }
   const requestedRangeNotSatisfiable = ({ request, response }) => {
-    if (request.aborted === true) {
+    if (request.aborted === true || response.writableEnded === true) {
       return
     }
     response
@@ -235,7 +235,7 @@ export const staticHandler = async (
       .end()
   }
   const partialContent = ({ boundary, content, eTag, lastModified, request, response }) => {
-    if (request.aborted === true) {
+    if (request.aborted === true || response.writableEnded === true) {
       return
     }
     response
@@ -251,7 +251,7 @@ export const staticHandler = async (
       .end(content)
   }
   const noContent = ({ contentLength, contentType, eTag, lastModified, request, response }) => {
-    if (request.aborted === true) {
+    if (request.aborted === true || response.writableEnded === true) {
       return
     }
     response
@@ -267,7 +267,7 @@ export const staticHandler = async (
       .end()
   }
   const ok = ({ absoluteFilepath, contentLength, contentType, eTag, lastModified, request, response }) => {
-    if (request.aborted === true) {
+    if (request.aborted === true || response.writableEnded === true) {
       return
     }
     response.writeHead(
@@ -282,7 +282,7 @@ export const staticHandler = async (
     fs.createReadStream(absoluteFilepath).pipe(response)
   }
   const indexPage = ({ content, eTag, lastModified, request, response }) => {
-    if (request.aborted === true) {
+    if (request.aborted === true || response.writableEnded === true) {
       return
     }
     response
@@ -361,7 +361,7 @@ export const staticHandler = async (
     }
   }
   const handle = async ({ request, response }) => {
-    if (request.aborted === true) {
+    if (request.aborted === true || response.writableEnded === true) {
       return
     }
     const dividerIndex = request.url.indexOf('?')

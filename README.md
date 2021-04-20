@@ -50,9 +50,6 @@ const example = async () => {
         request,
         response,
       })
-      if (response.writableEnded === true) {
-        return
-      }
       staticMiddleware.handle({
         request,
         response,
