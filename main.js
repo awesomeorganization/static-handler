@@ -73,6 +73,7 @@ const DEFAULT_CONTENT_TYPE_BY_EXTENSIONS = new Map([
   ['.zip', 'application/zip'],
 ])
 const DEFAULT_CONTENT_TYPE = 'application/octet-stream'
+const DEFAULT_DIGEST_ALGORITHM = 'blake2b512'
 const DEFAULT_DIRECTORY_PATH = '.'
 const DEFAULT_USE_INDEX_PAGE = true
 const DEFAULT_USE_WEAK_ETAGS = true
@@ -123,12 +124,14 @@ export const staticHandler = async (
   {
     contentTypeByExtensions = DEFAULT_CONTENT_TYPE_BY_EXTENSIONS,
     defaultContentType = DEFAULT_CONTENT_TYPE,
+    digestAlgorithm = DEFAULT_DIGEST_ALGORITHM,
     directoryPath = DEFAULT_DIRECTORY_PATH,
     useIndexPage = DEFAULT_USE_INDEX_PAGE,
     useWeakETags = DEFAULT_USE_WEAK_ETAGS,
   } = {
     contentTypeByExtensions: DEFAULT_CONTENT_TYPE_BY_EXTENSIONS,
     defaultContentType: DEFAULT_CONTENT_TYPE,
+    digestAlgorithm: DEFAULT_DIGEST_ALGORITHM,
     directoryPath: DEFAULT_DIRECTORY_PATH,
     useIndexPage: DEFAULT_USE_INDEX_PAGE,
     useWeakETags: DEFAULT_USE_WEAK_ETAGS,
@@ -159,19 +162,17 @@ export const staticHandler = async (
     }
     return headers
   }
-  const generateWeakETag = ({ stats: { mtime } }) => {
-    const value = mtime.valueOf().toString(36)
-    return `W/"${value}"`
+  const generateWeakETag = ({ stats: { ctime, mtime, size } }) => {
+    return `W/"${ctime.valueOf().toString(36)}-${mtime.valueOf().toString(36)}-${size.toString(36)}"`
   }
   const generateStrongETag = ({ absoluteFilepath }) => {
     return new Promise((resolve) => {
-      const hash = crypto.createHash('blake2b512')
+      const hash = crypto.createHash(digestAlgorithm)
       fs.createReadStream(absoluteFilepath, {
         emitClose: true,
       })
-        .on('close', () => {
-          const value = hash.read().toString('base64')
-          resolve(`"${value}"`)
+        .once('close', () => {
+          resolve(`"${hash.read().toString('base64')}"`)
         })
         .pipe(hash)
     })
