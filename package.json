@@ -13,7 +13,7 @@
     "@awesomeorganization/servers": "1.0.2",
     "eslint-config-prettier": "8.3.0",
     "eslint-plugin-node": "11.1.0",
-    "undici": "4.1.0"
+    "undici": "4.1.1"
   },
   "peerDependencies": {
     "eslint": "7.30.0",
