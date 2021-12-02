@@ -144,6 +144,7 @@ export const staticHandler = async (
     acceptRanges = RANGE_UNIT,
     cacheControl = 'public',
     contentLength = 0,
+    contentRange,
     contentType = DEFAULT_CONTENT_TYPE,
     eTag,
     lastModified,
@@ -154,6 +155,9 @@ export const staticHandler = async (
       ['Content-Length', contentLength],
       ['Content-Type', contentType],
     ]
+    if (contentRange !== undefined) {
+      headers.push(['Content-Range', contentRange])
+    }
     if (eTag !== undefined) {
       headers.push(['ETag', eTag])
     }
@@ -169,7 +173,9 @@ export const staticHandler = async (
     return new Promise((resolve) => {
       const hash = crypto.createHash(digestAlgorithm)
       fs.createReadStream(absoluteFilepath, {
-        emitClose: true,
+        flags: 'r',
+        encoding: null,
+        mode: 0o444,
       })
         .once('close', () => {
           resolve(`"${hash.read().toString('base64')}"`)
@@ -235,21 +241,35 @@ export const staticHandler = async (
       )
       .end()
   }
-  const partialContent = ({ boundary, content, eTag, lastModified, request, response }) => {
+  const partialContent = ({ boundary, content, contentLength, contentRange, contentType, eTag, isMultipart, lastModified, readStream, request, response }) => {
     if (request.aborted === true || response.writableEnded === true) {
       return
     }
-    response
-      .writeHead(
-        STATUS_PARTIAL_CONTENT,
-        generateHeaders({
-          contentLength: content.length,
-          contentType: `multipart/byteranges; boundary=${boundary}`,
-          eTag,
-          lastModified,
-        })
-      )
-      .end(content)
+    if (isMultipart === true) {
+      response
+        .writeHead(
+          STATUS_PARTIAL_CONTENT,
+          generateHeaders({
+            contentLength: content.length,
+            contentType: `multipart/byteranges; boundary=${boundary}`,
+            eTag,
+            lastModified,
+          })
+        )
+        .end(content)
+      return
+    }
+    response.writeHead(
+      STATUS_PARTIAL_CONTENT,
+      generateHeaders({
+        contentLength,
+        contentRange,
+        contentType,
+        eTag,
+        lastModified,
+      })
+    )
+    readStream.pipe(response)
   }
   const noContent = ({ contentLength, contentType, eTag, lastModified, request, response }) => {
     if (request.aborted === true || response.writableEnded === true) {
@@ -280,7 +300,11 @@ export const staticHandler = async (
         lastModified,
       })
     )
-    fs.createReadStream(absoluteFilepath).pipe(response)
+    fs.createReadStream(absoluteFilepath, {
+      flags: 'r',
+      encoding: null,
+      mode: 0o444,
+    }).pipe(response)
   }
   const indexPage = ({ content, eTag, lastModified, request, response }) => {
     if (request.aborted === true || response.writableEnded === true) {
@@ -300,7 +324,9 @@ export const staticHandler = async (
       .end(content)
   }
   const processDirectory = async ({ absoluteFilepath, relativeFilepath }) => {
-    const entities = await fs.promises.readdir(absoluteFilepath)
+    const entities = await fs.promises.readdir(absoluteFilepath, {
+      encoding: 'utf8',
+    })
     const content = [
       '<!DOCTYPE html>',
       '<html>',
@@ -332,7 +358,20 @@ export const staticHandler = async (
     if (unit !== RANGE_UNIT) {
       return undefined
     }
-    const fileHandle = await fs.promises.open(absoluteFilepath)
+    if (ranges.length === 1) {
+      const [{ end, start }] = ranges
+      return {
+        contentRange: `bytes ${start}-${end}/${contentLength}`,
+        isMultipart: false,
+        readStream: fs.createReadStream(absoluteFilepath, {
+          flags: 'r',
+          encoding: null,
+          mode: 0o444,
+        }),
+      }
+    }
+    // multipart
+    const fileHandle = await fs.promises.open(absoluteFilepath, 'r', 0o444)
     const boundary = Date.now().toString(36)
     const chunks = []
     for (const { end, start } of ranges) {
@@ -359,6 +398,7 @@ export const staticHandler = async (
     return {
       boundary,
       content,
+      isMultipart: true,
     }
   }
   const handle = async ({ request, response }) => {
@@ -454,12 +494,17 @@ export const staticHandler = async (
         })
         return
       }
-      const { boundary, content } = options
+      const { boundary, content, contentRange, isMultipart, readStream } = options
       partialContent({
         boundary,
         content,
+        contentLength,
+        contentRange,
+        contentType,
         eTag,
+        isMultipart,
         lastModified,
+        readStream,
         request,
         response,
       })
