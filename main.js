@@ -364,9 +364,11 @@ export const staticHandler = async (
         contentRange: `bytes ${start}-${end}/${contentLength}`,
         isMultipart: false,
         readStream: fs.createReadStream(absoluteFilepath, {
-          flags: 'r',
           encoding: null,
+          end,
+          flags: 'r',
           mode: 0o444,
+          start,
         }),
       }
     }

@@ -1,3 +1,9 @@
+.github
+.vscode
+example
+node_modules
+test
+
 .deepsource.toml
 .dockerignore
 .editorconfig
@@ -5,8 +11,6 @@
 .eslintrc.json
 .gitignore
 .prettierrc.json
-.vscode
+renovate.json
+
 *.log
-example
-node_modules
-test
