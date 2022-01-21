@@ -403,13 +403,34 @@ export const staticHandler = async (
       isMultipart: true,
     }
   }
+  const isPathInsideDirectory = (filePath, parentDirectoryPath) => {
+    const parentDirectoryParts = parentDirectoryPath.split(path.sep)
+    const filePathParts = filePath.split(path.sep)
+    return (
+      parentDirectoryParts.every((part, index) => {
+        return part === filePathParts[index]
+      }) === true
+    )
+  }
+  const resolveUrlPath = (request, directoryPath) => {
+    const dividerIndex = request.url.indexOf('?')
+    const urlFilepath = dividerIndex === -1 ? request.url : request.url.substring(0, dividerIndex)
+    const relativeFilepath = path.normalize(urlFilepath.substring(1))
+    const absoluteFilepath = path.resolve(directoryPath, relativeFilepath)
+    return [absoluteFilepath, relativeFilepath]
+  }
   const handle = async ({ request, response }) => {
     if (request.aborted === true || response.writableEnded === true) {
       return
     }
-    const dividerIndex = request.url.indexOf('?')
-    const relativeFilepath = dividerIndex === -1 ? request.url : request.url.substring(0, dividerIndex)
-    const absoluteFilepath = path.resolve(directoryPath, relativeFilepath.substring(1))
+    const [absoluteFilepath, relativeFilepath] = resolveUrlPath(request, directoryPath)
+    if (isPathInsideDirectory(absoluteFilepath, directoryPath) === false) {
+      notFound({
+        request,
+        response,
+      })
+      return
+    }
     let stats
     try {
       stats = await fs.promises.stat(absoluteFilepath)
