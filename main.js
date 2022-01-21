@@ -145,7 +145,7 @@ export const staticHandler = async (
     cacheControl = 'public',
     contentLength = 0,
     contentRange,
-    contentType = DEFAULT_CONTENT_TYPE,
+    contentType = defaultContentType,
     eTag,
     lastModified,
   }) => {
@@ -173,8 +173,8 @@ export const staticHandler = async (
     return new Promise((resolve) => {
       const hash = crypto.createHash(digestAlgorithm)
       fs.createReadStream(absoluteFilepath, {
-        flags: 'r',
         encoding: null,
+        flags: 'r',
         mode: 0o444,
       })
         .once('close', () => {
@@ -193,6 +193,7 @@ export const staticHandler = async (
         generateHeaders({
           acceptRanges: 'none',
           cacheControl: 'no-store',
+          contentType: 'text/plain',
         })
       )
       .end()
@@ -207,6 +208,7 @@ export const staticHandler = async (
         generateHeaders({
           acceptRanges: 'none',
           cacheControl: 'no-store',
+          contentType: 'text/plain',
         })
       )
       .end()
@@ -237,6 +239,7 @@ export const staticHandler = async (
         generateHeaders({
           acceptRanges: 'none',
           cacheControl: 'no-store',
+          contentType: 'text/plain',
         })
       )
       .end()
@@ -301,8 +304,8 @@ export const staticHandler = async (
       })
     )
     fs.createReadStream(absoluteFilepath, {
-      flags: 'r',
       encoding: null,
+      flags: 'r',
       mode: 0o444,
     }).pipe(response)
   }
@@ -403,13 +406,20 @@ export const staticHandler = async (
       isMultipart: true,
     }
   }
+  const normalize = (filepath) => {
+    let normalizedFilepath = path.normalize(filepath)
+    while (normalizedFilepath[0] === path.posix.sep || normalizedFilepath[0] === path.win32.sep || normalizedFilepath[0] === '.') {
+      normalizedFilepath = normalizedFilepath.substring(1)
+    }
+    return normalizedFilepath
+  }
   const handle = async ({ request, response }) => {
     if (request.aborted === true || response.writableEnded === true) {
       return
     }
     const dividerIndex = request.url.indexOf('?')
-    const relativeFilepath = dividerIndex === -1 ? request.url : request.url.substring(0, dividerIndex)
-    const absoluteFilepath = path.resolve(directoryPath, relativeFilepath.substring(1))
+    const relativeFilepath = normalize(dividerIndex === -1 ? request.url : request.url.substring(0, dividerIndex)).replaceAll('..', '')
+    const absoluteFilepath = path.join(directoryPath, relativeFilepath)
     let stats
     try {
       stats = await fs.promises.stat(absoluteFilepath)
@@ -531,5 +541,6 @@ export const staticHandler = async (
   }
   return {
     handle,
+    normalize,
   }
 }

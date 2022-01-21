@@ -1,27 +1,18 @@
 /* eslint-disable node/no-unsupported-features/es-syntax */
 
-import { deepStrictEqual } from 'assert'
+import { deepStrictEqual, strictEqual } from 'assert'
+import { join, resolve, sep } from 'path'
+
 import { http } from '@awesomeorganization/servers'
 import { readFile } from 'fs/promises'
-import { resolve } from 'path'
+import { request } from 'undici'
 import { staticHandler } from '../main.js'
-import undici from 'undici'
-
-const data = (body) => {
-  return new Promise((resolve) => {
-    const chunks = []
-    body.on('data', (chunk) => {
-      chunks.push(chunk)
-    })
-    body.once('end', () => {
-      resolve(Buffer.concat(chunks))
-    })
-  })
-}
 
 const test = async () => {
-  const { handle } = await staticHandler({
-    directoryPath: resolve(process.argv[1], '..', '..'),
+  const directoryPath = resolve(process.argv[1], '..')
+  const filename = process.argv[1].substring(process.argv[1].lastIndexOf(sep) + 1)
+  const { handle, normalize } = await staticHandler({
+    directoryPath,
   })
   http({
     listenOptions: {
@@ -30,16 +21,12 @@ const test = async () => {
     },
     async onListening() {
       const { address, port } = this.address()
-      const client = new undici.Client(`http://${address}:${port}`)
-      {
-        const filename = 'main.js'
-        const { body } = await client.request({
-          method: 'GET',
-          path: `/${filename}`,
-        })
-        deepStrictEqual(await data(body), await readFile(resolve(process.argv[1], '..', '..', filename)))
+      const { body } = await request(`http://${address}:${port}/${filename}`)
+      const chunks = []
+      for await (const chunk of body) {
+        chunks.push(chunk)
       }
-      await client.close()
+      deepStrictEqual(Buffer.concat(chunks), await readFile(join(directoryPath, filename)))
       this.close()
     },
     onRequest(request, response) {
@@ -49,6 +36,21 @@ const test = async () => {
       })
     },
   })
+  strictEqual(normalize('file'), 'file')
+  strictEqual(normalize('/file'), 'file')
+  strictEqual(normalize('\\file'), 'file')
+  strictEqual(normalize('../file'), 'file')
+  strictEqual(normalize('..\\file'), 'file')
+  strictEqual(normalize('/../file'), 'file')
+  strictEqual(normalize('\\..\\file'), 'file')
+  strictEqual(normalize('/../dir/../file'), 'file')
+  strictEqual(normalize('\\..\\dir\\..\\file'), 'file')
+  strictEqual(normalize('/../dir/../../file'), 'file')
+  strictEqual(normalize('\\..\\dir\\..\\..\\file'), 'file')
+  strictEqual(normalize('/../../file'), 'file')
+  strictEqual(normalize('\\..\\..\\file'), 'file')
+  strictEqual(normalize('//file'), 'file')
+  strictEqual(normalize('\\\\file'), 'file')
 }
 
 test()
