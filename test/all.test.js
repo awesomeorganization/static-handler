@@ -1,7 +1,7 @@
 /* eslint-disable node/no-unsupported-features/es-syntax */
 
 import { deepStrictEqual, strictEqual } from 'assert'
-import { join, resolve, sep } from 'path'
+import { join, posix, resolve, sep, win32 } from 'path'
 
 import { http } from '@awesomeorganization/servers'
 import { readFile } from 'fs/promises'
@@ -36,21 +36,22 @@ const test = async () => {
       })
     },
   })
-  strictEqual(normalize('file'), 'file')
-  strictEqual(normalize('/file'), 'file')
-  strictEqual(normalize('\\file'), 'file')
-  strictEqual(normalize('../file'), 'file')
-  strictEqual(normalize('..\\file'), 'file')
-  strictEqual(normalize('/../file'), 'file')
-  strictEqual(normalize('\\..\\file'), 'file')
-  strictEqual(normalize('/../dir/../file'), 'file')
-  strictEqual(normalize('\\..\\dir\\..\\file'), 'file')
-  strictEqual(normalize('/../dir/../../file'), 'file')
-  strictEqual(normalize('\\..\\dir\\..\\..\\file'), 'file')
-  strictEqual(normalize('/../../file'), 'file')
-  strictEqual(normalize('\\..\\..\\file'), 'file')
-  strictEqual(normalize('//file'), 'file')
-  strictEqual(normalize('\\\\file'), 'file')
+  const testNormalize = (platform) => {
+    strictEqual(normalize({ url: `${platform.sep}.` }), '/')
+    strictEqual(normalize({ url: `${platform.sep}..` }), '/')
+    strictEqual(normalize({ url: `${platform.sep}...` }), '/...')
+    strictEqual(normalize({ url: `${platform.sep}file` }), '/file')
+    strictEqual(normalize({ url: `${platform.sep}.file` }), `/.file`)
+    strictEqual(normalize({ url: `${platform.sep}..${platform.sep}file` }), '/file')
+    strictEqual(normalize({ url: `${platform.sep}..${platform.sep}..${platform.sep}file` }), '/file')
+    strictEqual(normalize({ url: `${platform.sep}..${platform.sep}dir${platform.sep}..${platform.sep}file` }), '/file')
+    strictEqual(normalize({ url: `${platform.sep}..${platform.sep}dir${platform.sep}..${platform.sep}..${platform.sep}file` }), '/file')
+    strictEqual(normalize({ url: `${platform.sep}${platform.sep}file` }), '/') // strange behaviour
+    strictEqual(normalize({ url: `${platform.sep}${platform.sep}..${platform.sep}file` }), '/file')
+    strictEqual(normalize({ url: `${platform.sep}${platform.sep}..${platform.sep}..${platform.sep}file` }), '/file')
+  }
+  testNormalize(posix)
+  testNormalize(win32)
 }
 
 test()

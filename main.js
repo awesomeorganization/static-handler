@@ -326,7 +326,7 @@ export const staticHandler = async (
       )
       .end(content)
   }
-  const processDirectory = async ({ absoluteFilepath, relativeFilepath }) => {
+  const processDirectory = async ({ absoluteFilepath }) => {
     const entities = await fs.promises.readdir(absoluteFilepath, {
       encoding: 'utf8',
     })
@@ -339,7 +339,7 @@ export const staticHandler = async (
       '<body>',
       '<ul>',
       ...entities.map((entity) => {
-        return `<li><a href="${relativeFilepath === '/' ? '' : relativeFilepath}/${entity}">${entity}</a></li>`
+        return `<li><a href="${entity}">${entity}</a></li>`
       }),
       '</ul>',
       '</body>',
@@ -406,20 +406,15 @@ export const staticHandler = async (
       isMultipart: true,
     }
   }
-  const normalize = (filepath) => {
-    let normalizedFilepath = path.normalize(filepath)
-    while (normalizedFilepath[0] === path.posix.sep || normalizedFilepath[0] === path.win32.sep || normalizedFilepath[0] === '.') {
-      normalizedFilepath = normalizedFilepath.substring(1)
-    }
-    return normalizedFilepath
+  const normalize = ({ url }) => {
+    const { pathname } = new URL(url, `http://localhost}`)
+    return pathname
   }
   const handle = async ({ request, response }) => {
     if (request.aborted === true || response.writableEnded === true) {
       return
     }
-    const dividerIndex = request.url.indexOf('?')
-    const relativeFilepath = normalize(dividerIndex === -1 ? request.url : request.url.substring(0, dividerIndex)).replaceAll('..', '')
-    const absoluteFilepath = path.join(directoryPath, relativeFilepath)
+    const absoluteFilepath = path.join(directoryPath, normalize(request))
     let stats
     try {
       stats = await fs.promises.stat(absoluteFilepath)
@@ -452,7 +447,6 @@ export const staticHandler = async (
       }
       const { content } = await processDirectory({
         absoluteFilepath,
-        relativeFilepath,
       })
       indexPage({
         content,
@@ -464,7 +458,7 @@ export const staticHandler = async (
       return
     }
     const contentLength = stats.size
-    const contentType = contentTypeByExtensions.get(path.extname(relativeFilepath)) ?? defaultContentType
+    const contentType = contentTypeByExtensions.get(path.extname(absoluteFilepath)) ?? defaultContentType
     if (
       ('if-match' in request.headers === true && request.headers['if-match'] !== eTag) ||
       ('if-match' in request.headers === false && 'if-unmodified-since' in request.headers === true && request.headers['if-unmodified-since'] < lastModified)

@@ -6,3 +6,8 @@ enabled = true
 
   [analyzers.meta]
   environment = ["nodejs"]
+  module_system = "es-modules"
+
+[[transformer]]
+name = "prettier"
+enabled = true

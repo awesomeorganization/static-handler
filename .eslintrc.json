@@ -27,6 +27,7 @@
     "no-var": "warn",
     "node/exports-style": ["warn", "module.exports"],
     "node/file-extension-in-import": ["warn", "always"],
+    "node/no-missing-import": "off",
     "node/prefer-global/buffer": ["warn", "always"],
     "node/prefer-global/console": ["warn", "always"],
     "node/prefer-global/process": ["warn", "always"],

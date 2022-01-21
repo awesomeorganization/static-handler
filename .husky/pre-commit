@@ -1,0 +1,9 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+volta run eslint --fix .
+volta run prettier --write .
+npm install --ignore-scripts --no-audit --no-fund
+npm test
+cd example
+npm install --ignore-scripts --no-audit --no-fund

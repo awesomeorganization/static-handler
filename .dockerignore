@@ -1,4 +1,5 @@
 .github
+.husky
 .vscode
 example
 node_modules
