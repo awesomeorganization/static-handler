@@ -4,12 +4,12 @@
 
 ---
 
-![npm](https://img.shields.io/david/awesomeorganization/static-handler)
-![npm](https://img.shields.io/npm/v/@awesomeorganization/static-handler)
-![npm](https://img.shields.io/npm/dt/@awesomeorganization/static-handler)
-![npm](https://img.shields.io/npm/l/@awesomeorganization/static-handler)
-![npm](https://img.shields.io/bundlephobia/minzip/@awesomeorganization/static-handler)
-![npm](https://img.shields.io/bundlephobia/min/@awesomeorganization/static-handler)
+![GitHub Workflow](https://img.shields.io/github/workflow/status/awesomeorganization/static-handler/npm-publish?style=flat-square)
+![Codacy](https://img.shields.io/codacy/grade/76fb942875ff435c856dd6f4713feb87?style=flat-square)
+![CodeFactor](https://img.shields.io/codefactor/grade/github/awesomeorganization/static-handler?style=flat-square)
+![Snyk](https://img.shields.io/snyk/vulnerabilities/npm/@awesomeorganization/static-handler?style=flat-square)
+![Depfu](https://img.shields.io/depfu/awesomeorganization/static-handler?style=flat-square)
+![npms.io](https://img.shields.io/npms-io/final-score/@awesomeorganization/static-handler?style=flat-square)
 
 ---
 
