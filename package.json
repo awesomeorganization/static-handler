@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@awesomeorganization/servers": "1.1.0",
-    "eslint-config-prettier": "8.3.0",
+    "eslint-config-prettier": "8.5.0",
     "eslint-plugin-node": "11.1.0",
     "husky": "7.0.4",
     "undici": "4.12.2"
