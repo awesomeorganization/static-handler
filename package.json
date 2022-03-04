@@ -20,7 +20,7 @@
     "eslint-config-prettier": "8.3.0",
     "eslint-plugin-node": "11.1.0",
     "husky": "7.0.4",
-    "undici": "4.12.2"
+    "undici": "4.15.0"
   },
   "keywords": [
     "rfc7230",
