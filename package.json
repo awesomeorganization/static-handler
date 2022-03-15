@@ -1,7 +1,7 @@
 {
   "name": "@awesomeorganization/static-handler",
   "description": "[ESM] The static handler for Node.js according to rfc7230, rfc7231, rfc7232, rfc7233, rfc7234 and whatwg",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "exports": "./main.js",
   "type": "module",
   "repository": "github:awesomeorganization/static-handler",
@@ -13,14 +13,16 @@
     "test": "node test/all.test.js"
   },
   "engines": {
-    "node": ">=10.0.0"
+    "node": ">=11.14.0"
   },
   "devDependencies": {
-    "@awesomeorganization/servers": "1.1.0",
-    "eslint-config-prettier": "8.3.0",
+    "@awesomeorganization/servers": "2.0.0",
+    "eslint-config-prettier": "8.5.0",
+    "eslint-plugin-github": "4.3.5",
     "eslint-plugin-node": "11.1.0",
+    "eslint-plugin-sonarjs": "0.12.0",
     "husky": "7.0.4",
-    "undici": "4.12.2"
+    "undici": "4.15.1"
   },
   "keywords": [
     "rfc7230",

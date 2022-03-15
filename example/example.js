@@ -1,5 +1,3 @@
-/* eslint-disable node/no-unsupported-features/es-syntax */
-
 import { REDIRECT_STATUS_CODES, rewriteHandler } from '@awesomeorganization/rewrite-handler'
 
 import { http } from '@awesomeorganization/servers'
@@ -23,19 +21,21 @@ const example = async () => {
     directoryPath: './static',
   })
   http({
+    handlers: {
+      request(request, response) {
+        rewriteMiddleware.handle({
+          request,
+          response,
+        })
+        staticMiddleware.handle({
+          request,
+          response,
+        })
+      },
+    },
     listenOptions: {
       host: '127.0.0.1',
       port: 3000,
-    },
-    onRequest(request, response) {
-      rewriteMiddleware.handle({
-        request,
-        response,
-      })
-      staticMiddleware.handle({
-        request,
-        response,
-      })
     },
   })
   // TRY

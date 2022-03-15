@@ -4,9 +4,12 @@
   "editor.autoClosingQuotes": "always",
   "editor.autoIndent": "full",
   "editor.autoSurround": "languageDefined",
+  "editor.bracketPairColorization.enabled": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.foldingImportsByDefault": true,
   "editor.formatOnSave": true,
   "editor.insertSpaces": true,
+  "editor.renderWhitespace": "all",
   "editor.suggestSelection": "first",
   "editor.tabSize": 2,
   "eslint.format.enable": true,
@@ -15,8 +18,5 @@
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,
   "git.autofetch": true,
-  "git.confirmSync": false,
-  "telemetry.enableCrashReporter": false,
-  "telemetry.enableTelemetry": false,
-  "vsintellicode.modify.editor.suggestSelection": "automaticallyOverrodeDefaultValue"
+  "git.confirmSync": false
 }

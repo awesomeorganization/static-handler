@@ -1,9 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env sh
 . "$(dirname "$0")/_/husky.sh"
 
 volta run eslint --fix .
 volta run prettier --write .
-npm install --ignore-scripts --no-audit --no-fund
-npm test
+volta run --node 16 --bundled-npm -- npm install --ignore-scripts
+volta run --node 16 --bundled-npm -- npm test
+volta run --node 14 --bundled-npm -- npm test
 cd example
-npm install --ignore-scripts --no-audit --no-fund
+volta run --node 16 --bundled-npm -- npm install

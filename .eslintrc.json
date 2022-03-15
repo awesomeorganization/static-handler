@@ -1,16 +1,17 @@
 {
-  "extends": ["eslint:recommended", "plugin:node/recommended", "prettier"],
   "env": {
-    "es2021": true,
+    "es2022": true,
     "node": true
   },
+  "extends": ["eslint:recommended", "plugin:node/recommended", "plugin:github/recommended", "plugin:sonarjs/recommended", "prettier"],
   "parserOptions": {
-    "ecmaVersion": "latest",
-    "sourceType": "module",
     "ecmaFeatures": {
       "impliedStrict": true
-    }
+    },
+    "ecmaVersion": "latest",
+    "sourceType": "module"
   },
+  "plugins": ["node", "github", "sonarjs"],
   "rules": {
     "arrow-body-style": ["warn", "always"],
     "camelcase": "warn",
@@ -19,22 +20,29 @@
     "default-case-last": "warn",
     "dot-notation": "warn",
     "eqeqeq": "warn",
+    "eslint-comments/no-use": "off",
+    "filenames/match-regex": "off",
+    "i18n-text/no-en": "off",
+    "import/extensions": ["warn", "always"],
+    "import/no-unresolved": "off",
     "no-duplicate-imports": "warn",
     "no-lonely-if": "warn",
     "no-return-assign": "warn",
     "no-return-await": "warn",
+    "no-unused-vars": "warn",
     "no-use-before-define": "warn",
     "no-var": "warn",
     "node/exports-style": ["warn", "module.exports"],
     "node/file-extension-in-import": ["warn", "always"],
     "node/no-missing-import": "off",
+    "node/no-unsupported-features/es-syntax": "warn",
     "node/prefer-global/buffer": ["warn", "always"],
     "node/prefer-global/console": ["warn", "always"],
     "node/prefer-global/process": ["warn", "always"],
     "node/prefer-global/text-decoder": ["warn", "always"],
     "node/prefer-global/text-encoder": ["warn", "always"],
-    "node/prefer-global/url-search-params": ["warn", "always"],
     "node/prefer-global/url": ["warn", "always"],
+    "node/prefer-global/url-search-params": ["warn", "always"],
     "node/prefer-promises/dns": "warn",
     "node/prefer-promises/fs": "warn",
     "object-shorthand": "warn",
@@ -43,6 +51,11 @@
     "prefer-rest-params": "warn",
     "prefer-spread": "warn",
     "require-await": "warn",
+    "sonarjs/cognitive-complexity": "off",
+    "sonarjs/no-duplicate-string": "warn",
+    "sonarjs/no-identical-functions": "warn",
+    "sonarjs/no-nested-switch": "off",
+    "sonarjs/no-small-switch": "warn",
     "sort-imports": "warn",
     "sort-keys": "warn",
     "sort-vars": "warn"

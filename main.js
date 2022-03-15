@@ -1,5 +1,3 @@
-/* eslint-disable node/no-unsupported-features/es-syntax */
-
 // REFERENCES
 // https://tools.ietf.org/html/rfc7230#section-3
 // https://tools.ietf.org/html/rfc7231#section-5.2
