@@ -405,7 +405,7 @@ export const staticHandler = async (
     }
   }
   const normalize = ({ url }) => {
-    const { pathname } = new URL(url, `http://localhost}`)
+    const { pathname } = new URL(url, 'http://localhost')
     return pathname
   }
   const handle = async ({ request, response }) => {
