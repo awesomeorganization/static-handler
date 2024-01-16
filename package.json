@@ -16,7 +16,7 @@
     "node": ">=11.14.0"
   },
   "devDependencies": {
-    "@awesomeorganization/servers": "2.0.0",
+    "@awesomeorganization/servers": "2.0.2",
     "eslint-config-prettier": "8.5.0",
     "eslint-plugin-github": "4.3.5",
     "eslint-plugin-node": "11.1.0",
