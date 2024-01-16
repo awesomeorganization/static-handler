@@ -5,7 +5,7 @@
   "type": "module",
   "dependencies": {
     "@awesomeorganization/rewrite-handler": "1.1.0",
-    "@awesomeorganization/servers": "2.0.0",
+    "@awesomeorganization/servers": "2.0.2",
     "@awesomeorganization/static-handler": ".."
   }
 }
